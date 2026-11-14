@@ -1,0 +1,452 @@
+/* Würfelflug – Oberfläche.
+   Aufbau: Die Spielfläche füllt das ganze Fenster. Das Menü liegt als linke
+   Spalte über der laufenden Demo, Pause und Ziel erscheinen als Karte in der Mitte.
+   Bewusst nur ein Erscheinungsbild: ein Spieltisch bei Nacht (dunkler Filz,
+   elfenbeinfarbener Würfel, rote Gefahren). */
+:root {
+  color-scheme: dark;
+
+  /* Farben */
+  --felt-950: #041613;
+  --felt-900: #06201c;
+  --felt-800: #0a2e28;
+  --felt-600: #165245;
+  --ivory: #f4ecd8;
+  --ivory-dim: #b5bfae;
+  --ink: #10201d;
+  --danger: #e8484f;
+  --brass: #ffb648;
+  --sky: #6fd0ff;
+  --violet: #baa0ff;
+  --mint: #7ee8c0;
+  --line: rgba(244, 236, 216, 0.17);
+  --line-strong: rgba(244, 236, 216, 0.4);
+  --wash: rgba(244, 236, 216, 0.07);
+  --wash-strong: rgba(244, 236, 216, 0.13);
+  --scrim: rgba(4, 22, 19, 0.62);
+  --glass: rgba(4, 22, 19, 0.6);
+
+  /* Schrift: Rubik (abgerundete Ecken wie ein Würfel) für Titel und Text,
+     IBM Plex Mono für Zahlen und Tasten */
+  --font-display: 'Rubik', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'Rubik', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--felt-950);
+  color: var(--ivory);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* ---------- Spielfläche ---------- */
+.game {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--felt-900);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+#stage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+  cursor: pointer;
+}
+.game[data-screen="menu"] #stage { cursor: default; }
+
+/* ---------- Anzeige während des Spiels ---------- */
+.hud {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 36%) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  pointer-events: none;
+}
+.hud-left, .hud-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hud-right { justify-content: flex-end; }
+.hud-try, .hud-pct {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.hud-progress { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hud-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(4, 22, 19, 0.6);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.hud-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ivory);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.hud-pct { min-width: 4.2ch; text-align: right; }
+.hud-btn {
+  pointer-events: auto;
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--glass);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hud-btn:hover { border-color: var(--line-strong); background: rgba(4, 22, 19, 0.82); }
+.hud-btn-text { padding: 0 14px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.icon { width: 22px; height: 22px; display: block; }
+.icon-sound-off { display: none; }
+.hud-btn[aria-pressed="true"] .icon-sound-on { display: none; }
+.hud-btn[aria-pressed="true"] .icon-sound-off { display: block; }
+
+/* Kurze Hinweise bei Portalen */
+.toast {
+  position: absolute;
+  top: 66px;
+  left: 50%;
+  max-width: calc(100% - 32px);
+  padding: 7px 14px 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(4, 22, 19, 0.8);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.toast::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 3px;
+  background: var(--toast-color, var(--ivory));
+}
+.toast.show { animation: toast 2.1s ease both; }
+@keyframes toast {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  10%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+
+/* ---------- Menü ---------- */
+.menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: linear-gradient(90deg, rgba(4, 22, 19, 0.97) 0%, rgba(4, 22, 19, 0.93) 30%, rgba(4, 22, 19, 0.45) 56%, rgba(4, 22, 19, 0) 78%);
+}
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: min(100%, 560px);
+  margin-block: auto;
+  margin-left: clamp(0px, 4vw, 72px);
+  padding-block: clamp(18px, 4vh, 40px) 18px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.menu-head, .menu-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.title {
+  margin: 0;
+  padding-top: 0.14em;
+  font-family: var(--font-display);
+  font-size: clamp(52px, 14.5vw, 88px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.015em;
+}
+.title-line { display: block; white-space: nowrap; }
+.title-flight { color: var(--sky); }
+.title-plane { display: inline-block; width: 0.95em; height: 0.6em; margin-left: 0.12em; vertical-align: 0.06em; }
+/* Die Ü-Punkte sind zwei rote Würfelaugen */
+.u-pips { position: relative; display: inline-block; }
+.u-pips::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -0.1em;
+  width: 0.15em;
+  height: 0.15em;
+  margin-left: -0.075em;
+  border-radius: 50%;
+  box-shadow: -0.16em 0 0 var(--danger), 0.16em 0 0 var(--danger);
+}
+
+.lede { margin: 0; max-width: 44ch; font-size: 17px; color: var(--ivory-dim); text-wrap: pretty; }
+
+.levels { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.level { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.level-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--wash);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.level-main:hover { background: var(--wash-strong); border-color: var(--line-strong); }
+.level-die { display: block; width: 40px; height: 40px; }
+.level-die .die-body { fill: var(--ivory); }
+.level-die .die-pip { fill: var(--ink); }
+.level-text { display: grid; min-width: 0; }
+.level-name { font-size: 18px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.level-meta { font-size: 13px; color: var(--ivory-dim); }
+.level-go {
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: var(--ivory);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.level-demo {
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(4, 22, 19, 0.35);
+  color: var(--ivory-dim);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.12s, border-color 0.12s;
+}
+.level-demo:hover { color: var(--ivory); border-color: var(--line-strong); }
+
+.switch { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; cursor: pointer; }
+.switch input {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--wash);
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+/* Der Schieber ist ein kleiner Würfel */
+.switch input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: radial-gradient(circle at 50% 50%, var(--ink) 0 2.6px, transparent 3px) var(--ivory);
+  transition: transform 0.15s;
+}
+.switch input:checked { background: var(--mint); border-color: var(--mint); }
+.switch input:checked::after { transform: translateX(20px); }
+.switch-text { display: grid; min-width: 0; }
+.switch-name { font-weight: 700; }
+.switch-hint { font-size: 13px; color: var(--ivory-dim); }
+
+.tip-rotate { display: none; margin: 0; font-size: 13px; color: var(--ivory-dim); }
+
+/* Spielregeln: am Desktop als Leiste unten im dunklen Boden */
+.menu-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 14px 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  margin-left: clamp(0px, 4vw, 72px);
+  margin-right: clamp(0px, 4vw, 72px);
+}
+.howto {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ivory-dim);
+}
+.howto li { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 10px; }
+.howto-icon { display: block; width: 28px; height: 28px; margin-top: -3px; }
+.howto b { color: var(--ivory); font-weight: 500; }
+
+.keys { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--ivory-dim); }
+kbd {
+  display: inline-block;
+  min-width: 1.9em;
+  margin: 0 0.35em 0 0.9em;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: center;
+  color: var(--ivory);
+}
+kbd:first-child { margin-left: 0; }
+
+/* ---------- Karten: Pause und Ziel ---------- */
+.dialog {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding-block: 20px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--scrim);
+}
+.dialog-card {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 380px);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--felt-800);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  outline: none;
+}
+.eyebrow { margin: 0 0 -10px; font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ivory-dim); }
+.dialog h2 { margin: 0; font-family: var(--font-display); font-size: 40px; font-weight: 900; line-height: 1; letter-spacing: -0.01em; text-wrap: balance; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.stats > div { padding: 10px 12px; border-radius: 12px; background: var(--wash); }
+.stats dt { font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ivory-dim); }
+.stats dd { margin: 2px 0 0; font-family: var(--font-mono); font-size: 21px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dialog-note { margin: 0; font-size: 14px; color: var(--ivory-dim); }
+.dialog-actions { display: grid; gap: 8px; }
+.btn {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--wash);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.btn:hover { background: var(--wash-strong); border-color: var(--line-strong); }
+.btn-primary { border-color: transparent; background: var(--ivory); color: var(--ink); }
+.btn-primary:hover { background: #fff8e6; border-color: transparent; }
+
+/* ---------- Schmale und niedrige Fenster ---------- */
+@media (max-width: 1040px) {
+  .howto { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .menu { background: rgba(4, 22, 19, 0.9); }
+  .menu-panel, .menu-foot { margin-inline: auto; width: min(100%, 592px); }
+  .menu-foot { border-top: 1px solid var(--line); }
+}
+@media (max-width: 560px) {
+  .hud { grid-template-columns: auto minmax(70px, 1fr) auto; gap: 8px; }
+  .level-go { display: none; }
+  .lede { font-size: 16px; }
+  .howto { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .tip-rotate { display: block; }
+}
+/* Querformat am Handy: Titel links, Levelliste rechts */
+@media (max-height: 560px) and (min-width: 640px) {
+  .menu-panel {
+    flex-direction: row;
+    align-items: center;
+    gap: 32px;
+    width: min(100%, 960px);
+    margin-inline: auto;
+    padding-block: 14px;
+  }
+  .menu-head { flex: 1 1 0; }
+  .menu-body { flex: 1.25 1 0; }
+  .title { font-size: clamp(40px, 15vh, 72px); }
+  .lede { font-size: 15px; }
+  .level-main { padding-block: 7px; }
+  .menu-foot { display: none; }
+}
+@media (max-height: 560px) and (max-width: 639px) {
+  .menu-foot { display: none; }
+}
+@media (hover: none) {
+  .keys { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast.show { animation-name: toast-still; }
+  .level-main, .level-demo, .btn, .switch input, .switch input::after { transition: none; }
+}
+@keyframes toast-still {
+  0% { opacity: 0; }
+  10%, 78% { opacity: 1; }
+  100% { opacity: 0; }
+}

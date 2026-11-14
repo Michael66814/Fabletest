@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Würfelflug</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Spring mit dem Würfel über Stacheln und Blöcke. Portale machen dich zum Papierflieger und ändern das Tempo.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%23f4ecd8'/%3E%3Ccircle cx='10.5' cy='10.5' r='2.6' fill='%2310201d'/%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%2310201d'/%3E%3Ccircle cx='21.5' cy='21.5' r='2.6' fill='%2310201d'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="game" id="game" data-screen="menu">
+  <canvas id="stage" tabindex="-1" aria-label="Spielfeld"></canvas>
+
+  <div class="hud" id="hud" hidden>
+    <div class="hud-left">
+      <span class="hud-try" id="hudTry">Versuch 1</span>
+      <span class="tag" id="hudTag" hidden>Übung</span>
+    </div>
+    <div class="hud-progress" id="hudProgress" role="progressbar" aria-label="Fortschritt im Level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="hud-track"><div class="hud-fill" id="hudFill"></div></div>
+      <span class="hud-pct" id="hudPct">0 %</span>
+    </div>
+    <div class="hud-right">
+      <button class="hud-btn hud-btn-text" id="btnTakeover" type="button" hidden>Selbst spielen</button>
+      <button class="hud-btn" id="btnSound" type="button" aria-label="Ton stummschalten" aria-pressed="false" title="Ton (M)">
+        <svg class="icon icon-sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4z" fill="currentColor"/><path d="M15 9.3a4 4 0 0 1 0 5.4M17.6 6.8a7.6 7.6 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <svg class="icon icon-sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4z" fill="currentColor"/><path d="M15.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="hud-btn" id="btnPause" type="button" aria-label="Pause" title="Pause (P)">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5.5" width="4" height="13" rx="1.2" fill="currentColor"/><rect x="13.5" y="5.5" width="4" height="13" rx="1.2" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <section class="menu" id="menu" aria-labelledby="title">
+    <div class="menu-panel">
+      <header class="menu-head">
+        <h1 class="title" id="title" aria-label="Würfelflug">
+          <span class="title-line" aria-hidden="true">W<span class="u-pips">U</span>RFEL</span>
+          <span class="title-line title-flight" aria-hidden="true">FLUG<svg class="title-plane" viewBox="0 0 64 40" aria-hidden="true"><path d="M2 22h6M14 23h6M26 24h5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55"/><path d="M62 8L32 30l6-11z" fill="currentColor" opacity=".7"/><path d="M62 8L26 12l12 7z" fill="currentColor"/></svg></span>
+        </h1>
+        <p class="lede">Spring mit dem Würfel über Stacheln und Blöcke. Portale machen dich zum Papierflieger und ändern das Tempo.</p>
+      </header>
+
+      <div class="menu-body">
+        <ol class="levels" id="levels" aria-label="Level"></ol>
+
+        <label class="switch" for="optPractice">
+          <input type="checkbox" id="optPractice">
+          <span class="switch-text">
+            <span class="switch-name">Übungsmodus</span>
+            <span class="switch-hint">Nach einem Fehler geht es am letzten Fähnchen weiter statt von vorn.</span>
+          </span>
+        </label>
+
+        <p class="tip-rotate">Im Querformat siehst du weiter voraus.</p>
+      </div>
+    </div>
+
+    <footer class="menu-foot">
+      <ul class="howto" aria-label="So wird gespielt">
+        <li>
+          <svg class="howto-icon" viewBox="0 0 28 28" aria-hidden="true"><rect x="5" y="9" width="14" height="14" rx="3.2" fill="#f4ecd8"/><circle cx="9" cy="13" r="1.5" fill="#10201d"/><circle cx="12" cy="16" r="1.5" fill="#10201d"/><circle cx="15" cy="19" r="1.5" fill="#10201d"/><path d="M21 12c2-3 2-6 0-9m0 0l-2.4 1.6M21 3l2.2 1.8" fill="none" stroke="#f4ecd8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><b>Klicken, tippen oder Leertaste:</b> springen. Gedrückt halten springt immer weiter.</span>
+        </li>
+        <li>
+          <svg class="howto-icon" viewBox="0 0 28 28" aria-hidden="true"><rect x="11.5" y="2" width="5" height="24" rx="2.5" fill="#6fd0ff" opacity=".35"/><path d="M12.2 3v22M15.8 3v22" stroke="#6fd0ff" stroke-width="1.4"/><path d="M26 11L8 13.5l5 3.5zM26 11L13 17l1.5 5z" fill="#6fd0ff"/></svg>
+          <span><b>Blaues Portal:</b> Du wirst zum Papierflieger. Jeder Klick gibt Auftrieb, auch mitten in der Luft.</span>
+        </li>
+        <li>
+          <svg class="howto-icon" viewBox="0 0 28 28" aria-hidden="true"><rect x="11.5" y="2" width="5" height="24" rx="2.5" fill="#baa0ff" opacity=".35"/><path d="M12.2 3v22M15.8 3v22" stroke="#baa0ff" stroke-width="1.4"/><rect x="8" y="8.5" width="12" height="12" rx="2.8" fill="none" stroke="#baa0ff" stroke-width="2"/><circle cx="14" cy="14.5" r="1.6" fill="#baa0ff"/></svg>
+          <span><b>Violettes Portal:</b> zurück zum Würfel, der nur vom Boden abspringt.</span>
+        </li>
+        <li>
+          <svg class="howto-icon" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2v24" stroke="#ffb648" stroke-width="1.6" opacity=".6"/><path d="M6 8l6 6-6 6M15 8l6 6-6 6" fill="none" stroke="#ffb648" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><b>Pfeil-Tore</b> ändern das Tempo: je mehr Pfeile, desto schneller.</span>
+        </li>
+      </ul>
+      <p class="keys"><kbd>P</kbd> Pause <kbd>M</kbd> Ton <kbd>R</kbd> Neustart</p>
+    </footer>
+  </section>
+
+  <section class="dialog" id="pause" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+    <div class="dialog-card" id="pauseCard" tabindex="-1">
+      <p class="eyebrow" id="pauseLevel">Level 1</p>
+      <h2 id="pauseTitle">Pause</h2>
+      <div class="dialog-actions">
+        <button class="btn btn-primary" id="btnResume" type="button">Weiter</button>
+        <button class="btn" id="btnRestart" type="button">Neu starten</button>
+        <button class="btn" id="btnQuit" type="button">Zum Menü</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="dialog" id="complete" role="dialog" aria-modal="true" aria-labelledby="completeTitle" hidden>
+    <div class="dialog-card" id="completeCard" tabindex="-1">
+      <p class="eyebrow" id="completeLevel">Level 1</p>
+      <h2 id="completeTitle">Geschafft!</h2>
+      <dl class="stats">
+        <div><dt>Versuche</dt><dd id="statTries">1</dd></div>
+        <div><dt>Klicks</dt><dd id="statClicks">0</dd></div>
+        <div><dt>Zeit</dt><dd id="statTime">0,0 s</dd></div>
+      </dl>
+      <p class="dialog-note" id="completeNote" hidden>Im Übungsmodus geschafft. Ohne Fähnchen zählt es für den Bestwert.</p>
+      <div class="dialog-actions">
+        <button class="btn btn-primary" id="btnNext" type="button">Nächstes Level</button>
+        <button class="btn" id="btnAgain" type="button">Nochmal</button>
+        <button class="btn" id="btnMenu" type="button">Zum Menü</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/level.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/demos.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
