@@ -149,6 +149,21 @@
           tone({ type: 'sine', f0: 820, f1: 300, dur: 0.26, vol: 0.09 });
         }
       },
+      pickup: function () {
+        if (!ready()) return;
+        var t = ac.currentTime;
+        tone({ type: 'triangle', f0: midi(79), dur: 0.12, vol: 0.16, at: t });
+        tone({ type: 'triangle', f0: midi(86), dur: 0.2, vol: 0.16, at: t + 0.06 });
+      },
+      flip: function (up) {
+        if (!ready()) return;
+        tone({ type: 'sine', f0: up ? 260 : 620, f1: up ? 620 : 260, dur: 0.16, vol: 0.14 });
+      },
+      shield: function () {
+        if (!ready()) return;
+        noise({ type: 'highpass', f0: 2400, f1: 6000, q: 0.8, dur: 0.22, vol: 0.2 });
+        tone({ type: 'triangle', f0: midi(84), f1: midi(72), dur: 0.25, vol: 0.14 });
+      },
       checkpoint: function () {
         if (!ready()) return;
         var t = ac.currentTime;

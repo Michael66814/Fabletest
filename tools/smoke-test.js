@@ -3,7 +3,8 @@
 
    Startet das Spiel in einem unsichtbaren Chromium und prüft die wichtigsten
    Abläufe: Menü, Springen per Klick und Leertaste, Tod und Neustart, Pause,
-   Zielbildschirm, Übungsmodus mit Checkpoint und die Demo.
+   Zielbildschirm, Statistik, Übungsmodus mit Checkpoint, Augments, Trickmodus
+   und die Demo aller Level.
 
    Voraussetzung: Playwright  (npm install --no-save playwright && npx playwright install chromium)
    Aufruf:        node tools/smoke-test.js [URL oder Datei]
@@ -62,7 +63,8 @@ async function main() {
   // ---- Menü ----
   let s = await state();
   check('Menü wird angezeigt', s.screen === 'menu' && await page.isVisible('#menu'));
-  check('drei Level stehen zur Auswahl', await page.locator('.level-main').count() === 3);
+  const ids = s.levelIds;
+  check('zehn Level stehen zur Auswahl, das leichteste zuerst', await page.locator('.level-main').count() === 10 && ids[0] === 'l1');
   const x0 = s.x;
   await page.waitForTimeout(700);
   s = await state();
@@ -114,7 +116,42 @@ async function main() {
   check('Bestwert wird gespeichert', s.best && s.best.l1 === 100);
   await page.click('#btnNext');
   s = await state();
-  check('"Nächstes Level" startet Level 2', s.screen === 'play' && s.level === 'l2');
+  check('"Nächstes Level" startet das nächstschwerere Level', s.screen === 'play' && s.levelIdx === 1 && s.level === ids[1]);
+
+  // ---- Augments: im Level "Sprungfeder" werden Sprungkraft, Doppelsprung und Schild eingesammelt ----
+  await page.keyboard.press('Escape');
+  await page.click('#btnQuit');
+  await page.click('[data-play="' + ids.indexOf('l4') + '"]');
+  const shielded = await until(() => globalThis.WF.debug.state().shield === 1, null, 30000);
+  const l4done = await until(() => globalThis.WF.debug.state().screen === 'complete', null, 30000);
+  s = await state();
+  check('Augments werden eingesammelt und wirken (Level mit Sprungkraft, Doppelsprung, Schild)',
+    shielded && l4done && s.taken === 7 && s.shield === 0, 'eingesammelt: Bitmaske ' + s.taken);
+  await page.click('#btnMenu');
+
+  // ---- Trickmodus mit echten Klicks: Doppelklick dreht die Schwerkraft, Dreifachklick fliegt ----
+  await set('timeScale', 4);
+  await page.click('[data-play="' + ids.indexOf('l5') + '"]');
+  await until(() => globalThis.WF.debug.state().mode === 'trick', null, 30000);
+  await set('autopilot', false);
+  await set('timeScale', 1);
+  const clicks = async n => {
+    for (let k = 0; k < n; k++) {
+      await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.5);
+      if (k < n - 1) await page.waitForTimeout(90);
+    }
+  };
+  await clicks(2);
+  const flipped = await until(() => globalThis.WF.debug.state().grav === -1, null, 1500);
+  await page.waitForTimeout(450);
+  await clicks(3);
+  const flew = await until(() => globalThis.WF.debug.state().fly > 0, null, 1500);
+  check('echter Doppelklick dreht die Schwerkraft, echter Dreifachklick startet den Flug', flipped && flew);
+  await set('autopilot', true);
+  await set('timeScale', 10);
+  await page.keyboard.press('Escape');
+  await page.click('#btnQuit');
+  await page.click('[data-play="1"]');
 
   // ---- zurück ins Menü ----
   await set('autopilot', false);
@@ -122,7 +159,20 @@ async function main() {
   await page.keyboard.press('Escape');
   await page.click('#btnQuit');
   check('zurück im Menü, Level 1 ist als geschafft markiert', (await state()).screen === 'menu' &&
-    /Geschafft/.test(await page.textContent('#levelMeta0')));
+    /geschafft/.test(await page.textContent('#levelBest0')));
+
+  // ---- Statistik und Spielregeln ----
+  await page.click('#btnStats');
+  s = await state();
+  const grid = await page.textContent('#statsGrid');
+  check('Statistik zeigt geschaffte Level, Spielzeit und Versuche', await page.isVisible('#stats') &&
+    /Geschaffte Level\s*2 \/ 10/.test(grid) && /Spielzeit/.test(grid) && s.stats.tries >= 3 && s.stats.wins === 2,
+    s.stats.tries + ' Versuche, ' + s.stats.wins + ' Siege, Ø ' + Math.round(s.stats.pct / s.stats.tries) + ' %');
+  check('Statistik listet alle zehn Level', await page.locator('#statsRows tr').count() === 10);
+  await page.click('#btnStatsClose');
+  await page.click('#btnRules');
+  check('Spielregeln lassen sich öffnen', await page.isVisible('#rules') && /Trickmodus/.test(await page.textContent('#rules')));
+  await page.click('#btnRulesClose');
 
   // ---- Übungsmodus: nach dem Tod geht es am Fähnchen weiter ----
   await page.check('#optPractice');
@@ -146,15 +196,20 @@ async function main() {
   await page.uncheck('#optPractice');
 
   // ---- Demo: der Bot spielt jedes Level bis ins Ziel ----
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < ids.length; i++) {
     await set('timeScale', 10);
     await page.click('[data-demo="' + i + '"]');
+    if (ids[i] === 'l5') {
+      check('Trickmodus: Doppelklick dreht die Schwerkraft, Dreifachklick fliegt',
+        await until(() => globalThis.WF.debug.state().grav === -1, null, 20000) &&
+        await until(() => globalThis.WF.debug.state().fly > 0, null, 30000));
+    }
     const finished = await until(() => {
       const d = globalThis.WF.debug.state();
       return d.demo && d.screen === 'play' && d.done;
-    }, null, 40000);
+    }, null, 60000);
     s = await state();
-    check('Demo von Level ' + (i + 1) + ' erreicht das Ziel', finished && !s.dead, Math.round(s.pct) + ' %');
+    check('Demo von Level ' + (i + 1) + ' (' + ids[i] + ') erreicht das Ziel', finished && !s.dead, Math.round(s.pct) + ' %');
     await until(() => globalThis.WF.debug.state().screen === 'menu', null, 10000);
   }
   await set('timeScale', 1);

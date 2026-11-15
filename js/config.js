@@ -52,6 +52,17 @@
     BUFFER_STEPS: Math.round(0.10 * STEPS_PER_SECOND),  // zu früher Klick zählt noch
     COYOTE_STEPS: Math.round(0.06 * STEPS_PER_SECOND),  // kurz nach der Kante noch abspringen
 
+    // Trickmodus: 1 Klick springen, 2 Klicks Schwerkraft umdrehen, 3 Klicks Flug auf Zeit
+    CHAIN_STEPS: Math.round(0.30 * STEPS_PER_SECOND),   // so schnell müssen die Klicks aufeinander folgen
+    FLY_STEPS: 3 * STEPS_PER_SECOND,                    // Dauer des Flugs nach dem Dreifachklick
+
+    // Augments zum Einsammeln
+    BOOST_STEPS: 6 * STEPS_PER_SECOND,     // Sprungkraft: so lange springt der Würfel höher …
+    BOOST_FACTOR: 1.3,                     // … und zwar mit 1,3-facher Absprunggeschwindigkeit
+    DOUBLE_STEPS: 8 * STEPS_PER_SECOND,    // Doppelsprung: so lange ist ein zweiter Sprung in der Luft möglich
+    SHIELD_STEPS: Math.round(0.8 * STEPS_PER_SECOND),   // Schild: so lange ist man nach dem Treffer unverwundbar
+    PICKUP_RADIUS: 0.45,
+
     // Level-Aufbau
     LEAD_IN: 14,     // freie Anlaufstrecke vor dem ersten Hindernis
     FINISH_GAP: 7,   // Abstand vom letzten Hindernis bis zum Ziel

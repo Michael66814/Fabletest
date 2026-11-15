@@ -20,7 +20,8 @@
     cube: { top: [6, 30, 27], bot: [25, 92, 76], ground: [6, 27, 24], block: [4, 19, 17], tile: [11, 41, 36], lamp: [88, 190, 150] },
     plane: { top: [8, 20, 56], bot: [36, 86, 152], ground: [7, 20, 50], block: [4, 13, 36], tile: [13, 32, 70], lamp: [110, 165, 245] }
   };
-  var PORTAL_RGB = { plane: [111, 208, 255], cube: [186, 160, 255] };
+  var PORTAL_RGB = { plane: [111, 208, 255], cube: [186, 160, 255], trick: [198, 243, 94] };
+  var PICKUP_RGB = { boost: [255, 182, 72], double: [255, 111, 174], shield: [126, 232, 192] };
   var SPEED_RGB = [[126, 232, 192], [244, 236, 216], [255, 182, 72], [255, 111, 174]];
   var CONFETTI = [IVORY, DANGER, '#ffb648', '#6fd0ff', '#7ee8c0', '#baa0ff'];
 
@@ -91,7 +92,7 @@
   }
 
   // Der Spielwürfel: elfenbeinfarben mit dunklen Augen
-  function drawDie(g, cx, cy, size, rot, face) {
+  function drawDie(g, cx, cy, size, rot, face, edge) {
     var h = size / 2;
     g.save();
     g.translate(cx, cy);
@@ -100,7 +101,7 @@
     g.fillStyle = IVORY;
     g.fill();
     g.lineWidth = Math.max(1, size * 0.055);
-    g.strokeStyle = IVORY_DARK;
+    g.strokeStyle = edge || IVORY_DARK;
     roundRectPath(g, -h + g.lineWidth / 2, -h + g.lineWidth / 2, size - g.lineWidth, size - g.lineWidth, size * 0.17);
     g.stroke();
     g.fillStyle = PIP;
@@ -440,6 +441,26 @@
       g.restore();
     }
 
+    // Trickmodus: zwei Pfeile, einer nach oben, einer nach unten
+    function drawTrickIcon(g, cx, cy, s, color) {
+      g.save();
+      g.fillStyle = color;
+      for (var k = -1; k <= 1; k += 2) {
+        var ax = cx + k * s * 0.24;
+        g.beginPath();
+        g.moveTo(ax, cy - k * s * 0.5);
+        g.lineTo(ax + s * 0.22, cy - k * s * 0.12);
+        g.lineTo(ax + s * 0.08, cy - k * s * 0.12);
+        g.lineTo(ax + s * 0.08, cy + k * s * 0.46);
+        g.lineTo(ax - s * 0.08, cy + k * s * 0.46);
+        g.lineTo(ax - s * 0.08, cy - k * s * 0.12);
+        g.lineTo(ax - s * 0.22, cy - k * s * 0.12);
+        g.closePath();
+        g.fill();
+      }
+      g.restore();
+    }
+
     function drawDieIcon(g, cx, cy, s, color) {
       g.save();
       g.lineWidth = Math.max(1.5, s * 0.14);
@@ -541,8 +562,84 @@
         ctx.strokeStyle = rgba(col, 1);
         ctx.stroke();
         if (p.mode === 'plane') drawPlaneIcon(ctx, sx, by + bob + u * 0.02, u * 0.62, rgba(col, 1));
+        else if (p.mode === 'trick') drawTrickIcon(ctx, sx, by + bob, u * 0.62, rgba(col, 1));
         else drawDieIcon(ctx, sx, by + bob, u * 0.56, rgba(col, 1));
       }
+    }
+
+    // Augment zum Einsammeln: schwebende Marke mit Symbol
+    function drawPickup(it, t) {
+      var u = V.u, r = u * 0.44;
+      var cx = X(it.cx), cy = Y(it.cy) + Math.sin(t * 3 + it.cx) * u * 0.07;
+      var col = PICKUP_RGB[it.kind], solid = rgba(col, 1);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.55, 0, TAU);
+      ctx.fillStyle = rgba(col, 0.16);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, TAU);
+      ctx.fillStyle = 'rgba(4,16,18,0.86)';
+      ctx.fill();
+      ctx.lineWidth = Math.max(2, u * 0.07);
+      ctx.strokeStyle = solid;
+      ctx.stroke();
+      ctx.fillStyle = solid;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (it.kind === 'boost') {                       // Pfeil nach oben
+        ctx.moveTo(cx, cy - r * 0.62);
+        ctx.lineTo(cx + r * 0.5, cy - r * 0.06);
+        ctx.lineTo(cx + r * 0.2, cy - r * 0.06);
+        ctx.lineTo(cx + r * 0.2, cy + r * 0.56);
+        ctx.lineTo(cx - r * 0.2, cy + r * 0.56);
+        ctx.lineTo(cx - r * 0.2, cy - r * 0.06);
+        ctx.lineTo(cx - r * 0.5, cy - r * 0.06);
+        ctx.closePath();
+        ctx.fill();
+      } else if (it.kind === 'double') {               // zwei Winkel übereinander
+        ctx.lineWidth = r * 0.22;
+        ctx.moveTo(cx - r * 0.42, cy - r * 0.02);
+        ctx.lineTo(cx, cy - r * 0.44);
+        ctx.lineTo(cx + r * 0.42, cy - r * 0.02);
+        ctx.moveTo(cx - r * 0.42, cy + r * 0.42);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx + r * 0.42, cy + r * 0.42);
+        ctx.stroke();
+      } else {                                         // Schild
+        ctx.moveTo(cx - r * 0.46, cy - r * 0.48);
+        ctx.lineTo(cx + r * 0.46, cy - r * 0.48);
+        ctx.lineTo(cx + r * 0.46, cy + r * 0.02);
+        ctx.quadraticCurveTo(cx + r * 0.4, cy + r * 0.46, cx, cy + r * 0.64);
+        ctx.quadraticCurveTo(cx - r * 0.4, cy + r * 0.46, cx - r * 0.46, cy + r * 0.02);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Was der Spieler gerade bei sich trägt: Schild als Blase, Zeiten als Ringe
+    function drawAura(G) {
+      var s = G.s, u = V.u, cx = X(G.rx), cy = Y(G.ry);
+      function ring(radius, frac, col) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * u, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(0.02, frac));
+        ctx.lineWidth = Math.max(2, u * 0.08);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = rgba(col, 0.95);
+        ctx.stroke();
+      }
+      if (s.shield > 0) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, u * 0.82, 0, TAU);
+        ctx.fillStyle = rgba(PICKUP_RGB.shield, 0.13);
+        ctx.fill();
+        ctx.lineWidth = Math.max(2, u * 0.06);
+        ctx.strokeStyle = rgba(PICKUP_RGB.shield, 0.9);
+        ctx.stroke();
+      }
+      if (s.fly > 0) ring(0.98, s.fly / C.FLY_STEPS, PORTAL_RGB.trick);
+      if (s.boost > 0) ring(s.fly > 0 ? 1.12 : 0.98, s.boost / C.BOOST_STEPS, PICKUP_RGB.boost);
+      if (s.dbl > 0) ring(s.boost > 0 ? 1.12 : 0.98, s.dbl / C.DOUBLE_STEPS, PICKUP_RGB.double);
     }
 
     function drawFlag(it, reached) {
@@ -594,6 +691,7 @@
           it = list[i];
           if (it.type === 'spike') drawSpike(it);
           else if (it.type === 'saw') drawSaw(it, t);
+          else if (it.type === 'pickup') { if (!(G.s.taken & it.bit)) drawPickup(it, t); }
           else if (it.type === 'flag' && G.practice && !G.demo) drawFlag(it, it.index <= G.cpIndex);
         }
       }
@@ -610,7 +708,8 @@
 
     function drawShadow(G) {
       var u = V.u;
-      var hh = G.rmode === 'plane' ? C.PLANE.hh : C.CUBE.hh;
+      if (G.s.grav < 0) return;
+      var hh = G.rfly ? C.PLANE.hh : C.CUBE.hh;
       var surf = surfaceBelow(G.level, G.rx, G.ry - hh);
       var dist = Math.max(0, G.ry - hh - surf);
       var k = 1 - clamp01(dist / 4.5);
@@ -728,8 +827,12 @@
         if (G.showPlayer) {
           drawShadow(G);
           drawTrail(fx.trail);
-          if (G.rmode === 'plane') drawPlane(X(G.rx), Y(G.ry), G.rrot, fx.face);
-          else drawDie(ctx, X(G.rx), Y(G.ry), V.u * 0.98, G.rrot, fx.face);
+          // nach einem Schild-Treffer blinkt der Spieler, solange er unverwundbar ist
+          if (G.s.inv > 0 && Math.floor(now / 70) % 2 === 0) ctx.globalAlpha = 0.45;
+          if (G.rfly) drawPlane(X(G.rx), Y(G.ry), G.rrot, fx.face);
+          else drawDie(ctx, X(G.rx), Y(G.ry), V.u * 0.98, G.rrot, fx.face, G.rmode === 'trick' ? '#9fd13a' : null);
+          ctx.globalAlpha = 1;
+          drawAura(G);
         }
       }
       drawParticles(fx.particles);
@@ -753,6 +856,7 @@
   WF.draw = {
     PIPS: PIPS,
     PORTAL_RGB: PORTAL_RGB,
+    PICKUP_RGB: PICKUP_RGB,
     SPEED_RGB: SPEED_RGB,
     CONFETTI: CONFETTI,
     IVORY: IVORY,

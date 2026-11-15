@@ -8,6 +8,8 @@
      m   kleiner Stachel         w   kleiner Stachel an der Decke
      o   kleine Säge             O   große Säge
      P   Portal: Flugmodus       C   Portal: Würfelmodus
+     T   Portal: Trickmodus (1 Klick springen, 2 Klicks Schwerkraft, 3 Klicks Flug)
+     J   Augment: Sprungkraft    D   Augment: Doppelsprung    S   Augment: Schild
      1 2 3 4   Tempo-Tor: langsam / normal / schnell / sehr schnell
      |   Checkpoint (nur im Übungsmodus)
      .   oder Leerzeichen: frei
@@ -61,6 +63,8 @@
     var items = [];        // pro Spalte: Dinge, die gezeichnet werden
     var portals = [];
     var checkpoints = [];
+    var pickups = [];      // pro Spalte: Augments zum Einsammeln
+    var pickupCount = 0;
 
     function addHazard(h, xFrom, xTo) {
       for (var xi = Math.floor(xFrom); xi <= Math.floor(xTo); xi++) {
@@ -84,6 +88,13 @@
       addItem(x, { type: 'saw', cx: cx, cy: cy, r: radius, phase: (x * 37 + y * 11) % 7 });
     }
 
+    function addPickup(kind, x, y) {
+      if (pickupCount >= 30) throw new Error('Level "' + def.id + '": höchstens 30 Augments pro Level');
+      var p = { type: 'pickup', kind: kind, cx: x + 0.5, cy: y + 0.5, r: C.PICKUP_RADIUS, bit: 1 << pickupCount++ };
+      (pickups[x] = pickups[x] || []).push(p);
+      addItem(x, p);
+    }
+
     // ---- Zeichen einlesen ----
     var x0 = C.LEAD_IN;
     for (i = 0; i < chunks.length; i++) {
@@ -105,6 +116,10 @@
             case 'O': addSaw(x, y, 1.0); break;
             case 'P': portals.push({ kind: 'mode', mode: 'plane', x: x + 0.5, y: y, col: x }); break;
             case 'C': portals.push({ kind: 'mode', mode: 'cube', x: x + 0.5, y: y, col: x }); break;
+            case 'T': portals.push({ kind: 'mode', mode: 'trick', x: x + 0.5, y: y, col: x }); break;
+            case 'J': addPickup('boost', x, y); break;
+            case 'D': addPickup('double', x, y); break;
+            case 'S': addPickup('shield', x, y); break;
             case '1': case '2': case '3': case '4':
               portals.push({ kind: 'speed', speed: +ch - 1, x: x + 0.5, y: y, col: x });
               break;
@@ -146,7 +161,6 @@
     return {
       id: def.id,
       name: def.name,
-      difficulty: def.difficulty,
       width: width,
       contentEnd: contentEnd,
       finishX: finishX,
@@ -155,6 +169,8 @@
       items: items,
       portals: portals,
       checkpoints: checkpoints,
+      pickups: pickups,
+      pickupCount: pickupCount,
       // Fester Untergrund? Unter y=0 liegt überall Boden; eine Decke in der
       // obersten Zeile reicht gedanklich unendlich weit nach oben.
       solidAt: function (xi, yi) {

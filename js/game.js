@@ -6,7 +6,12 @@
   var C = WF.CFG;
   var sim = WF.sim;
   var STORE_KEY = 'wuerfelflug.v1';
-  var DIFFICULTY = ['', 'Leicht', 'Mittel', 'Schwer'];
+  var TIER_NAMES = ['', 'Leicht', 'Mittel', 'Schwer', 'Sehr schwer', 'Extrem'];
+  var PICKUP_TEXT = {
+    boost: 'Sprungkraft: 6 Sekunden lang höher springen',
+    double: 'Doppelsprung: 8 Sekunden lang ein zweiter Sprung in der Luft',
+    shield: 'Schild: schützt einmal vor Stacheln und Sägen'
+  };
   var MUSIC_TEMPO = [0.9, 1, 1.1, 1.2];
   var SPEED_FX = [0, 0, 0.6, 1];
 
@@ -15,13 +20,38 @@
   function $(id) { return document.getElementById(id); }
   function rand(a, b) { return a + Math.random() * (b - a); }
 
+  // Schwierigkeitsstufe aus der Wertung des Prüf-Bots (1 bis 10)
+  function tierOf(score) {
+    if (score < 3) return 1;
+    if (score < 5) return 2;
+    if (score < 6.5) return 3;
+    if (score < 8) return 4;
+    return 5;
+  }
+  function comma(value, digits) {
+    return value.toFixed(digits).replace('.', ',');
+  }
+  function clock(seconds) {
+    var t = Math.floor(seconds), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sec = t % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+  function freshStats() {
+    return { time: 0, tries: 0, pct: 0, clicks: 0, wins: 0, portals: 0, pickups: 0, flips: 0, levels: {} };
+  }
+
   function start(hot) {
     var root = $('game');
     var canvas = $('stage');
     var renderer = WF.createRenderer(canvas);
     var audio = WF.createAudio();
     var V = renderer.view;
-    var levels = WF.LEVEL_DEFS.map(function (def) { return WF.buildLevel(def); });
+    // Level nach der Schwierigkeitswertung sortieren: das leichteste zuerst
+    var levels = WF.LEVEL_DEFS.map(function (def, i) {
+      var level = WF.buildLevel(def);
+      level.rating = (WF.RATINGS && WF.RATINGS[def.id]) || { score: 5, seconds: 0 };
+      level.order = i;
+      return level;
+    }).sort(function (a, b) { return a.rating.score - b.rating.score || a.order - b.order; });
     var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
     var el = {
@@ -33,11 +63,13 @@
       complete: $('complete'), completeCard: $('completeCard'), completeLevel: $('completeLevel'),
       completeTitle: $('completeTitle'), completeNote: $('completeNote'),
       statTries: $('statTries'), statClicks: $('statClicks'), statTime: $('statTime'),
-      btnNext: $('btnNext')
+      btnNext: $('btnNext'),
+      stats: $('stats'), statsCard: $('statsCard'), statsGrid: $('statsGrid'), statsRows: $('statsRows'),
+      btnStatsReset: $('btnStatsReset'), rules: $('rules'), rulesCard: $('rulesCard')
     };
 
     // ---------- Gespeicherte Einstellungen und Bestwerte ----------
-    var store = { best: {}, muted: false, practice: false };
+    var store = { best: {}, muted: false, practice: false, stats: freshStats() };
     try {
       var raw = window.localStorage.getItem(STORE_KEY);
       if (raw) {
@@ -46,6 +78,13 @@
           if (parsed.best && typeof parsed.best === 'object') store.best = parsed.best;
           store.muted = !!parsed.muted;
           store.practice = !!parsed.practice;
+          if (parsed.stats && typeof parsed.stats === 'object') {
+            var fresh = freshStats();
+            for (var key in fresh) {
+              if (typeof parsed.stats[key] === typeof fresh[key] && parsed.stats[key] !== null) fresh[key] = parsed.stats[key];
+            }
+            store.stats = fresh;
+          }
         }
       }
     } catch (e) { /* ohne Speicher läuft das Spiel trotzdem */ }
@@ -55,6 +94,24 @@
     }
     function saveStore() {
       try { window.localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* egal */ }
+    }
+    function levelStats(level) {
+      var all = store.stats.levels;
+      return all[level.id] || (all[level.id] = { tries: 0, wins: 0, time: 0 });
+    }
+    // Ein Versuch ist zu Ende (Absturz oder Ziel): für die Statistik festhalten
+    function countAttempt(percent, won) {
+      if (G.demo || G.practice) return;
+      var st = store.stats, ls = levelStats(G.level);
+      st.tries++;
+      st.pct += percent;
+      ls.tries++;
+      if (won) {
+        var seconds = finishStep / C.STEPS_PER_SECOND;
+        st.wins++;
+        ls.wins++;
+        if (!ls.time || seconds < ls.time) ls.time = seconds;
+      }
     }
     function saveBest(level, value) {
       var v = Math.floor(value);
@@ -89,7 +146,7 @@
     var lastSpeedIdx = C.START_SPEED;
     var finishStep = 0, finishJumps = 0;
     var attractIdx = 0;
-    var input = { held: false, pressed: false };
+    var input = { held: false, presses: 0 };
     var debug = { autopilot: false, timeScale: 1 };     // nur für automatische Tests
     var shownPct = -1, shownTry = '';
     var toastTimer = 0;
@@ -155,15 +212,20 @@
       G.fx.flashColor = color;
       G.fx.flash = strength;
     }
-    function toast(text, cssColor) {
+    function toast(text, cssColor, long) {
       if (screen !== 'play') return;
       el.toast.textContent = text;
       el.toast.style.setProperty('--toast-color', cssColor);
-      el.toast.classList.remove('show');
+      el.toast.classList.remove('show', 'long');
       void el.toast.offsetWidth;                 // Animation neu starten
       el.toast.classList.add('show');
+      if (long) el.toast.classList.add('long');
       window.clearTimeout(toastTimer);
-      toastTimer = window.setTimeout(function () { el.toast.classList.remove('show'); }, 2200);
+      toastTimer = window.setTimeout(function () { el.toast.classList.remove('show', 'long'); }, long ? 4700 : 2200);
+    }
+    // Zähler für die Statistik (nur echtes Spielen, keine Demo)
+    function count(key) {
+      if (screen === 'play' && !G.demo) store.stats[key]++;
     }
     function sfx(name, arg) {
       if (screen === 'play') audio.sfx[name](arg);
@@ -178,7 +240,8 @@
         var e = events[i], p = e.data, col;
         switch (e.type) {
           case 'jump':
-            puff(e.x, e.y - C.CUBE.hh, 5, IVORY, 1);
+          case 'djump':
+            puff(e.x, e.y - C.CUBE.hh * G.s.grav, 5, e.type === 'djump' ? cssRgb(WF.draw.PICKUP_RGB.double) : IVORY, 1);
             sfx('jump');
             break;
           case 'flap':
@@ -186,11 +249,46 @@
             sfx('flap');
             break;
           case 'land':
-            if (G.s.mode === 'cube') {
+            if (!sim.isFlying(G.s)) {
               G.fx.face = G.fx.face % 6 + 1;            // gelandet = neu gewürfelt
-              puff(e.x, e.y - C.CUBE.hh, 4, IVORY, 0.7);
+              puff(e.x, e.y - C.CUBE.hh * G.s.grav, 4, IVORY, 0.7);
               sfx('land');
             }
+            break;
+          case 'flip':
+            col = WF.draw.PORTAL_RGB.trick;
+            burst(e.x, e.y, 8, cssRgb(col), 0.6, true);
+            sfx('flip', G.s.grav < 0);
+            count('flips');
+            break;
+          case 'fly':
+            col = WF.draw.PORTAL_RGB.trick;
+            burst(e.x, e.y, 12, cssRgb(col), 0.8, true);
+            flash(col, 0.14);
+            prev.rot = G.s.rot;
+            toast('Flug für 3 Sekunden: Jeder Klick gibt Auftrieb', cssRgb(col));
+            sfx('portal', 'plane');
+            break;
+          case 'flyend':
+            prev.rot = G.s.rot;
+            G.fx.trail.length = 0;
+            burst(e.x, e.y, 8, cssRgb(WF.draw.PORTAL_RGB.trick), 0.5, true);
+            break;
+          case 'pickup':
+            col = WF.draw.PICKUP_RGB[p.kind];
+            burst(p.cx, p.cy, 12, cssRgb(col), 0.7, true);
+            flash(col, 0.12);
+            toast(PICKUP_TEXT[p.kind], cssRgb(col));
+            sfx('pickup');
+            count('pickups');
+            break;
+          case 'shield':
+            col = WF.draw.PICKUP_RGB.shield;
+            burst(e.x, e.y, 18, cssRgb(col), 1.1, true);
+            flash(col, 0.24);
+            if (!reduceMotion) G.fx.shake = 0.25;
+            toast('Schild verbraucht', cssRgb(col));
+            sfx('shield');
             break;
           case 'mode':
             col = WF.draw.PORTAL_RGB[p.mode];
@@ -198,8 +296,10 @@
             flash(col, 0.22);
             prev.rot = G.s.rot;
             G.fx.trail.length = 0;
-            toast(p.mode === 'plane' ? 'Flugmodus: Jeder Klick gibt Auftrieb' : 'Würfelmodus: Springen nur vom Boden', cssRgb(col));
-            sfx('portal', p.mode);
+            if (p.mode === 'trick') toast('Trickmodus: 1 Klick springt, Doppelklick dreht die Schwerkraft, Dreifachklick fliegt', cssRgb(col), true);
+            else toast(p.mode === 'plane' ? 'Flugmodus: Jeder Klick gibt Auftrieb' : 'Würfelmodus: Springen nur vom Boden', cssRgb(col));
+            sfx('portal', p.mode === 'cube' ? 'cube' : 'plane');
+            count('portals');
             break;
           case 'speed':
             col = WF.draw.SPEED_RGB[p.speed];
@@ -208,6 +308,7 @@
             sfx('speed', p.speed > lastSpeedIdx);
             lastSpeedIdx = p.speed;
             audio.music.setTempo(MUSIC_TEMPO[p.speed]);
+            count('portals');
             break;
         }
       }
@@ -221,6 +322,7 @@
       G.ry = prev.y + (s.y - prev.y) * a;
       G.rrot = prev.rot + (s.rot - prev.rot) * a;
       G.rmode = s.mode;
+      G.rfly = sim.isFlying(s);
       if (phase === 'finish') G.camX = camFreeze;
       else G.camX = G.rx - (screen === 'menu' ? V.menuSX : V.playerSX) / V.u;
     }
@@ -243,7 +345,7 @@
       G.showPlayer = true;
       G.fx.trail.length = 0;
       lastSpeedIdx = G.s.speedIdx;
-      input.pressed = false;
+      input.presses = 0;
       audio.music.setTempo(MUSIC_TEMPO[G.s.speedIdx]);
       syncRender(0);
     }
@@ -264,7 +366,7 @@
     function trackTrail() {
       var s = G.s, trail = G.fx.trail;
       if (s.step % 5 !== 0) return;
-      if (s.mode === 'plane') {
+      if (sim.isFlying(s)) {
         trail.push({ x: s.x - 0.55, y: s.y });
         if (trail.length > 30) trail.shift();
       } else if (trail.length) {
@@ -284,7 +386,9 @@
       if (!reduceMotion) G.fx.shake = 0.45;
       flash([255, 120, 110], 0.26);
       sfx('death');
+      countAttempt(pct(), false);
       if (!G.demo && !G.practice) saveBest(G.level, pct());
+      else if (!G.demo) saveStore();
     }
 
     function respawn() {
@@ -308,7 +412,9 @@
       confetti();
       flash([244, 236, 216], 0.2);
       sfx('finish');
+      countAttempt(100, true);
       if (!G.demo && !G.practice) saveBest(G.level, 100);
+      if (!G.demo) saveStore();
     }
 
     function afterFinish() {
@@ -330,9 +436,12 @@
         if (G.demo || debug.autopilot) {
           press = demoSet ? demoSet.has(s.step) : false;
         } else {
-          press = input.pressed;
+          press = input.presses > 0;
           hold = input.held;
-          input.pressed = false;
+          if (press) {
+            input.presses--;
+            store.stats.clicks++;
+          }
         }
       }
       sim.step(G.level, s, press, hold);
@@ -374,7 +483,7 @@
 
     function updateFx(dt) {
       var fx = G.fx, s = G.s, i;
-      fx.modeBlend += ((s.mode === 'plane' ? 1 : 0) - fx.modeBlend) * Math.min(1, dt * 4.5);
+      fx.modeBlend += ((sim.isFlying(s) ? 1 : 0) - fx.modeBlend) * Math.min(1, dt * 4.5);
       var speedTarget = phase === 'dead' ? 0 : SPEED_FX[s.speedIdx];
       fx.speedFx += (speedTarget - fx.speedFx) * Math.min(1, dt * 4);
       fx.shake *= Math.exp(-dt * 9);
@@ -424,6 +533,7 @@
       var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
       lastT = t;
       renderer.resize();
+      if (screen === 'play' && !G.demo && phase === 'run') store.stats.time += dt;
       if (screen !== 'pause' && screen !== 'complete') update(dt);
       if (screen !== 'pause') updateFx(dt);
       syncRender(phase === 'run' || phase === 'finish' ? acc / C.DT : 1);
@@ -444,10 +554,13 @@
       el.pause.hidden = name !== 'pause';
       el.complete.hidden = name !== 'complete';
       el.btnPause.hidden = name === 'complete';
+      el.stats.hidden = true;
+      el.rules.hidden = true;
       if (name !== 'play') {
-        el.toast.classList.remove('show');
+        el.toast.classList.remove('show', 'long');
         input.held = false;
-        input.pressed = false;
+        input.presses = 0;
+        saveStore();
       }
     }
 
@@ -532,7 +645,7 @@
     }
 
     // ---------- Levelliste im Menü ----------
-    // Würfelbild mit n Augen: Level 1 zeigt eine Eins, Level 2 eine Zwei …
+    // Würfelbild mit n Augen: die Augenzahl ist die Schwierigkeitsstufe (1 Leicht … 5 Extrem)
     function dieSvg(n) {
       var out = '<svg class="level-die" viewBox="0 0 42 42" aria-hidden="true"><rect class="die-body" x="2" y="2" width="38" height="38" rx="9"/>';
       var pos = WF.draw.PIPS[Math.max(1, Math.min(6, n))];
@@ -543,11 +656,12 @@
     }
 
     function levelMeta(level) {
+      var r = level.rating;
+      return TIER_NAMES[tierOf(r.score)] + ' ' + comma(r.score, 1) + ' · ' + clock(r.seconds);
+    }
+    function levelBest(level) {
       var best = store.best[level.id] || 0;
-      var text = DIFFICULTY[level.difficulty] || '';
-      if (best >= 100) return text + ' · Geschafft';
-      if (best > 0) return text + ' · Bestwert ' + best + ' %';
-      return text + ' · Noch nicht gespielt';
+      return best >= 100 ? 'geschafft' : (best > 0 ? best + ' %' : 'neu');
     }
 
     function renderLevelList() {
@@ -555,24 +669,70 @@
         var html = '';
         for (var i = 0; i < levels.length; i++) {
           html += '<li class="level">' +
-            '<button class="level-main" type="button" data-play="' + i + '">' + dieSvg(i + 1) +
+            '<button class="level-main" type="button" data-play="' + i + '">' + dieSvg(tierOf(levels[i].rating.score)) +
             '<span class="level-text"><span class="level-name">' + levels[i].name + '</span>' +
-            '<span class="level-meta" id="levelMeta' + i + '"></span></span>' +
-            '<span class="level-go" aria-hidden="true">Spielen</span></button>' +
+            '<span class="level-meta">' + levelMeta(levels[i]) + '</span></span>' +
+            '<span class="level-best" id="levelBest' + i + '"></span></button>' +
             (demoFor(levels[i]) ? '<button class="level-demo" type="button" data-demo="' + i + '" aria-label="Demo ansehen: ' + levels[i].name + '">Demo</button>' : '') +
             '</li>';
         }
         el.levels.innerHTML = html;
       }
       for (var k = 0; k < levels.length; k++) {
-        $('levelMeta' + k).textContent = levelMeta(levels[k]);
+        var node = $('levelBest' + k), text = levelBest(levels[k]);
+        node.textContent = text;
+        node.className = 'level-best' + (text === 'geschafft' ? ' is-done' : (text === 'neu' ? ' is-new' : ''));
       }
+    }
+
+    // ---------- Statistik ----------
+    function renderStats() {
+      var st = store.stats, done = 0, i;
+      for (i = 0; i < levels.length; i++) if (store.best[levels[i].id] >= 100) done++;
+      var tiles = [
+        ['Geschaffte Level', done + ' / ' + levels.length],
+        ['Spielzeit', clock(st.time)],
+        ['Versuche', String(st.tries)],
+        ['Ø Fortschritt pro Versuch', st.tries ? Math.round(st.pct / st.tries) + ' %' : '–'],
+        ['Erfolgsquote', st.tries ? comma(100 * st.wins / st.tries, 1) + ' %' : '–'],
+        ['Klicks', String(st.clicks)],
+        ['Portale und Tore', String(st.portals)],
+        ['Augments', String(st.pickups)],
+        ['Schwerkraft-Wechsel', String(st.flips)]
+      ];
+      var html = '';
+      for (i = 0; i < tiles.length; i++) html += '<div><dt>' + tiles[i][0] + '</dt><dd>' + tiles[i][1] + '</dd></div>';
+      el.statsGrid.innerHTML = html;
+
+      html = '';
+      for (i = 0; i < levels.length; i++) {
+        var level = levels[i], ls = st.levels[level.id] || { tries: 0, wins: 0, time: 0 };
+        var best = store.best[level.id] || 0;
+        html += '<tr><th scope="row">' + (i + 1) + '. ' + level.name + '</th>' +
+          '<td>' + comma(level.rating.score, 1) + '</td>' +
+          '<td>' + (best ? best + ' %' : '–') + '</td>' +
+          '<td>' + ls.tries + '</td>' +
+          '<td>' + ls.wins + '</td>' +
+          '<td>' + (ls.time ? comma(ls.time, 1) + ' s' : '–') + '</td></tr>';
+      }
+      el.statsRows.innerHTML = html;
+    }
+
+    var resetArmed = 0;
+    function disarmReset() {
+      window.clearTimeout(resetArmed);
+      resetArmed = 0;
+      el.btnStatsReset.textContent = 'Statistik zurücksetzen';
+    }
+    function openDialog(node, card) {
+      node.hidden = false;
+      card.focus({ preventScroll: true });
     }
 
     // ---------- Eingabe ----------
     function press() {
       input.held = true;
-      input.pressed = true;
+      input.presses = Math.min(4, input.presses + 1);
     }
     function release() {
       input.held = false;
@@ -601,6 +761,9 @@
         e.preventDefault();
         audio.unlock();
         if (!e.repeat && !G.demo) press();
+      } else if (e.code === 'Escape' && (!el.stats.hidden || !el.rules.hidden)) {
+        el.stats.hidden = true;
+        el.rules.hidden = true;
       } else if (e.code === 'Escape' || e.code === 'KeyP') {
         if (screen === 'play') pauseGame();
         else if (screen === 'pause') resumeGame();
@@ -649,6 +812,26 @@
       store.practice = el.optPractice.checked;
       saveStore();
     });
+    onClick($('btnStats'), function () {
+      disarmReset();
+      renderStats();
+      openDialog(el.stats, el.statsCard);
+    });
+    onClick($('btnStatsClose'), function () { el.stats.hidden = true; });
+    onClick(el.btnStatsReset, function () {
+      // Sicherheitsabfrage ohne Browser-Dialog: zweimal drücken
+      if (!resetArmed) {
+        el.btnStatsReset.textContent = 'Wirklich löschen? Nochmal drücken';
+        resetArmed = window.setTimeout(disarmReset, 4000);
+        return;
+      }
+      disarmReset();
+      store.stats = freshStats();
+      saveStore();
+      renderStats();
+    });
+    onClick($('btnRules'), function () { openDialog(el.rules, el.rulesCard); });
+    onClick($('btnRulesClose'), function () { el.rules.hidden = true; });
     onClick(el.btnSound, function () { setMuted(!store.muted); });
     onClick(el.btnPause, pauseGame);
     onClick(el.btnTakeover, function () { startGame(G.levelIdx, false); });
@@ -683,7 +866,9 @@
           screen: screen, phase: phase, level: G.level.id, demo: G.demo, practice: G.practice,
           x: G.s.x, y: G.s.y, mode: G.s.mode, speedIdx: G.s.speedIdx, dead: G.s.dead, done: G.s.done,
           pct: pct(), attempts: attempts, cpIndex: G.cpIndex, jumps: G.s.jumps,
-          best: store.best, muted: store.muted
+          grav: G.s.grav, fly: G.s.fly, shield: G.s.shield, taken: G.s.taken,
+          levelIdx: G.levelIdx, levelIds: levels.map(function (l) { return l.id; }),
+          best: store.best, muted: store.muted, stats: store.stats
         };
       }
     };

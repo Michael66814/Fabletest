@@ -1,5 +1,11 @@
 /* Würfelflug – Simulation (Physik + Kollision), komplett ohne Browser-APIs.
-   Dieselbe Datei wird vom Spiel UND vom Prüf-Bot (tools/solve.js) benutzt. */
+   Dieselbe Datei wird vom Spiel UND vom Prüf-Bot (tools/solve.js) benutzt.
+
+   Spielmodi:
+     cube   Würfel: springt vom Boden oder von einem Block ab
+     plane  Papierflieger: jeder Klick gibt Auftrieb
+     trick  Trickwürfel: 1 Klick springen, 2 Klicks Schwerkraft umdrehen,
+            3 Klicks für kurze Zeit Papierflieger */
 (function (WF) {
   'use strict';
 
@@ -19,6 +25,18 @@
       portalIdx: 0,       // nächstes noch nicht durchflogenes Portal
       step: 0,
       jumps: 0,
+      // Trickmodus
+      grav: 1,            // 1 = Schwerkraft nach unten, -1 = nach oben
+      chain: 0,           // Klicks der laufenden Klickfolge
+      chainT: 0,          // verbleibende Schritte, in denen ein Klick die Folge fortsetzt
+      fly: 0,             // verbleibende Schritte als Flieger (nach Dreifachklick)
+      // Augments
+      boost: 0,           // verbleibende Schritte mit höherer Sprungkraft
+      dbl: 0,             // verbleibende Schritte mit Doppelsprung
+      airJump: false,     // Doppelsprung in dieser Flugphase schon verbraucht
+      shield: 0,          // 1 = Schild aktiv
+      inv: 0,             // verbleibende Schritte Unverwundbarkeit nach einem Schild-Treffer
+      taken: 0,           // Bitmaske der eingesammelten Augments
       dead: false,
       deathBy: '',
       done: false,
@@ -34,6 +52,9 @@
     b.onGround = a.onGround; b.coyote = a.coyote; b.buffer = a.buffer;
     b.rot = a.rot; b.portalIdx = a.portalIdx;
     b.step = a.step; b.jumps = a.jumps;
+    b.grav = a.grav; b.chain = a.chain; b.chainT = a.chainT; b.fly = a.fly;
+    b.boost = a.boost; b.dbl = a.dbl; b.airJump = a.airJump;
+    b.shield = a.shield; b.inv = a.inv; b.taken = a.taken;
     b.dead = a.dead; b.deathBy = a.deathBy; b.done = a.done;
     b.inflate = a.inflate;
     b.events = null;
@@ -52,6 +73,11 @@
 
   function speedOf(s) {
     return C.BASE_SPEED * C.SPEEDS[s.speedIdx];
+  }
+
+  // Fliegt der Spieler gerade (Flug-Portal oder Dreifachklick im Trickmodus)?
+  function isFlying(s) {
+    return s.mode === 'plane' || s.fly > 0;
   }
 
   // ---- Geometrie: Dreieck gegen achsenparalleles Rechteck (Trennachsen-Test) ----
@@ -99,44 +125,114 @@
     return false;
   }
 
+  function collect(level, s, hw, hh) {
+    var x0 = Math.floor(s.x - hw - 0.5), x1 = Math.floor(s.x + hw + 0.5);
+    for (var xi = x0; xi <= x1; xi++) {
+      var list = level.pickups[xi];
+      if (!list) continue;
+      for (var i = 0; i < list.length; i++) {
+        var p = list[i];
+        if (s.taken & p.bit) continue;
+        if (!circleHitsBox(p.cx, p.cy, p.r, s.x - hw, s.y - hh, s.x + hw, s.y + hh)) continue;
+        s.taken |= p.bit;
+        if (p.kind === 'boost') s.boost = C.BOOST_STEPS;
+        else if (p.kind === 'double') s.dbl = C.DOUBLE_STEPS;
+        else s.shield = 1;
+        emit(s, 'pickup', p);
+      }
+    }
+  }
+
   /* Ein Physik-Schritt.
      press: Taste wurde in diesem Schritt neu gedrückt
      hold:  Taste ist (noch) gedrückt */
   function step(level, s, press, hold) {
     if (s.dead) return;
 
-    var plane = s.mode === 'plane';
-    var P = plane ? C.PLANE : C.CUBE;
-    var hw = P.hw, hh = P.hh;
+    var flying = isFlying(s);
     var dt = C.DT;
     var wasGround = s.onGround;
     s.step++;
+    if (s.boost > 0) s.boost--;
+    if (s.dbl > 0) s.dbl--;
+    if (s.inv > 0) s.inv--;
 
     // ---- Eingabe ----
-    if (plane) {
+    if (flying) {
       if (press) {
-        s.vy = P.flapV;
+        s.vy = C.PLANE.flapV;
         s.onGround = false;
         s.jumps++;
         emit(s, 'flap');
       }
     } else {
-      if (press) s.buffer = C.BUFFER_STEPS;
-      else if (s.buffer > 0) s.buffer--;
-      if ((s.buffer > 0 || hold) && (s.onGround || s.coyote > 0)) {
-        s.vy = P.jumpV;
-        s.onGround = false;
-        s.coyote = 0;
-        s.buffer = 0;
-        s.jumps++;
-        emit(s, 'jump');
+      if (s.mode === 'trick') {
+        if (press) {
+          s.chain = s.chainT > 0 ? s.chain + 1 : 1;
+          s.chainT = C.CHAIN_STEPS;
+          if (s.chain === 1) {
+            s.buffer = C.BUFFER_STEPS;
+          } else if (s.chain === 2) {
+            // Doppelklick: Schwerkraft umdrehen
+            s.grav = -s.grav;
+            s.onGround = false;
+            s.coyote = 0;
+            s.buffer = 0;
+            s.jumps++;
+            emit(s, 'flip');
+          } else {
+            // Dreifachklick: für kurze Zeit Papierflieger
+            s.fly = C.FLY_STEPS;
+            s.grav = 1;
+            s.chain = 0;
+            s.chainT = 0;
+            s.buffer = 0;
+            s.coyote = 0;
+            s.onGround = false;
+            s.vy = C.PLANE.flapV;
+            s.rot = 0;
+            s.jumps++;
+            flying = true;
+            emit(s, 'fly');
+          }
+        } else {
+          if (s.chainT > 0) s.chainT--;
+          if (s.buffer > 0) s.buffer--;
+        }
+      } else if (press) {
+        s.buffer = C.BUFFER_STEPS;
+      } else if (s.buffer > 0) {
+        s.buffer--;
+      }
+
+      if (!flying) {
+        var jumpV = C.CUBE.jumpV * (s.boost > 0 ? C.BOOST_FACTOR : 1) * s.grav;
+        if ((s.buffer > 0 || hold) && (s.onGround || s.coyote > 0)) {
+          s.vy = jumpV;
+          s.onGround = false;
+          s.coyote = 0;
+          s.buffer = 0;
+          s.jumps++;
+          emit(s, 'jump');
+        } else if (press && s.mode === 'cube' && s.dbl > 0 && !s.airJump) {
+          // Doppelsprung: ein zweiter Absprung mitten in der Luft
+          s.vy = jumpV;
+          s.airJump = true;
+          s.buffer = 0;
+          s.jumps++;
+          emit(s, 'djump');
+        }
       }
     }
     var groundBeforeMove = s.onGround;
 
+    var P = flying ? C.PLANE : C.CUBE;
+    var hw = P.hw, hh = P.hh;
+    var g = flying ? 1 : s.grav;          // Richtung der Schwerkraft
+
     // ---- Bewegung ----
-    s.vy -= P.g * dt;
-    if (s.vy < -P.maxFall) s.vy = -P.maxFall;
+    s.vy -= P.g * dt * g;
+    if (s.vy * g < -P.maxFall) s.vy = -P.maxFall * g;
     s.x += speedOf(s) * dt;
     s.y += s.vy * dt;
 
@@ -145,11 +241,12 @@
     if (s.y - hh <= 0) {
       s.y = hh;
       if (s.vy < 0) s.vy = 0;
-      grounded = true;
+      if (g === 1) grounded = true;
     }
-    if (s.y + hh > C.ROWS) {
+    if (s.y + hh >= C.ROWS) {
       s.y = C.ROWS - hh;
       if (s.vy > 0) s.vy = 0;
+      if (g === -1) grounded = true;
     }
 
     // ---- Blöcke ----
@@ -164,17 +261,18 @@
         var bottom = s.y - hh, top = s.y + hh;
         if (bottom >= yi + 1 || top <= yi) continue;      // nach einer Korrektur kein Kontakt mehr
         if (bottom >= yi + 1 - landTol && !level.solidAt(xi, yi + 1)) {
-          // knapp über der Oberkante: landen (oder beim Aufsteigen einfach weiter)
+          // knapp über der Oberkante: aufsetzen (oder beim Aufsteigen einfach weiter)
           if (s.vy <= 0) {
             s.y = yi + 1 + hh;
             s.vy = 0;
-            grounded = true;
+            if (g === 1) grounded = true;
           }
         } else if (top <= yi + bonkTol && !level.solidAt(xi, yi - 1)) {
-          // knapp unter der Unterkante: Kopf anstoßen
-          if (s.vy > 0) {
+          // knapp unter der Unterkante: anstoßen – bei umgedrehter Schwerkraft ist das der "Boden"
+          if (s.vy >= 0 && (s.vy > 0 || g === -1)) {
             s.y = yi - hh;
             s.vy = 0;
+            if (g === -1) grounded = true;
           }
         } else {
           kill(s, 'block');
@@ -184,25 +282,44 @@
     }
 
     // ---- Stacheln und Sägen ----
-    if (hazardAt(level, s.x, s.y, hw, hh, C.HAZ_INSET - s.inflate)) {
-      kill(s, 'hazard');
-      return;
+    if (s.inv === 0 && hazardAt(level, s.x, s.y, hw, hh, C.HAZ_INSET - s.inflate)) {
+      if (s.shield > 0) {
+        s.shield = 0;
+        s.inv = C.SHIELD_STEPS;
+        emit(s, 'shield');
+      } else {
+        kill(s, 'hazard');
+        return;
+      }
     }
+
+    // ---- Augments einsammeln ----
+    collect(level, s, hw, hh);
 
     // ---- Bodenkontakt, Absprung-Kulanz, Drehung ----
     if (grounded && !wasGround) emit(s, 'land');
     if (groundBeforeMove && !grounded) s.coyote = C.COYOTE_STEPS;
     else if (s.coyote > 0) s.coyote--;
     s.onGround = grounded;
+    if (grounded) s.airJump = false;
 
-    if (plane) {
+    if (flying) {
       var tilt = Math.atan2(s.vy, speedOf(s) * 1.6);
       s.rot += (tilt - s.rot) * 0.06;
     } else if (grounded) {
       var target = Math.round(s.rot / HALF_PI) * HALF_PI;
       s.rot += (target - s.rot) * 0.3;
     } else {
-      s.rot += P.spin * dt;
+      s.rot += C.CUBE.spin * dt * g;
+    }
+
+    // ---- Flug auf Zeit läuft ab ----
+    if (s.fly > 0) {
+      s.fly--;
+      if (s.fly === 0) {
+        s.rot = 0;
+        emit(s, 'flyend');
+      }
     }
 
     // ---- Portale ----
@@ -215,6 +332,10 @@
           s.rot = 0;
           s.coyote = 0;
           s.buffer = 0;
+          s.grav = 1;
+          s.chain = 0;
+          s.chainT = 0;
+          s.fly = 0;
           if (p.mode === 'plane') {
             if (s.vy > C.PLANE.flapV) s.vy = C.PLANE.flapV;
             if (s.vy < -C.PLANE.maxFall) s.vy = -C.PLANE.maxFall;
@@ -239,6 +360,7 @@
     copyState: copyState,
     step: step,
     speedOf: speedOf,
+    isFlying: isFlying,
     hazardAt: hazardAt
   };
 })(globalThis.WF = globalThis.WF || {});
