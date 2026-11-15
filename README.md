@@ -74,6 +74,18 @@ Die Summe wird auf die Skala 1–10 abgebildet. Aktuelle Rangliste:
 | 9 | Nadelöhr | 7,2 | Sehr schwer | 1:12 |
 | 10 | Würfelhölle | 8,5 | Extrem | 1:46 |
 
+## Als Minispiel im Hauptspiel
+
+Würfelflug ist das erste von mehreren Minispielen eines größeren Spiels mit Quests.
+Im `<iframe>` meldet es sich beim Hauptspiel, startet auf Wunsch direkt ein Level
+und meldet Ereignisse (Level geschafft, Augment eingesammelt, Schwerkraft gedreht …).
+Quests werden als Daten beschrieben und gegen diese Ereignisse geprüft.
+
+- Schnittstelle und Quest-Format: [`docs/minispiele-und-quests.md`](docs/minispiele-und-quests.md)
+- Test-Oberfläche mit Beispiel-Quests: `node tools/serve.js`, dann <http://localhost:8080/hub/>
+
+Allein geöffnet verhält sich Würfelflug wie vorher.
+
 ## Aufbau
 
 | Datei | Aufgabe |
@@ -87,6 +99,10 @@ Die Summe wird auf die Skala 1–10 abgebildet. Aktuelle Rangliste:
 | `js/audio.js` | Geräusche und Musik |
 | `js/game.js` | Spielablauf, Eingabe, Menüs |
 | `js/demos.js` | Lösungen und Schwierigkeitswertung des Bots (wird erzeugt, nicht von Hand ändern) |
+| `js/manifest.js`, `js/embed.js` | Beschreibung fürs Hauptspiel und Anbindung im `<iframe>` |
+| `platform/` | Minispiel-Protokoll und Quest-Buch (für alle Minispiele gleich) |
+| `hub/` | Test-Oberfläche des Hauptspiels mit Beispiel-Quests |
+| `docs/` | Schnittstelle und Quest-Format |
 | `tools/` | Prüf-Bot, Browser-Test, Webserver, Einzeldatei-Paket |
 
 Die Physik rechnet in festen Schritten (240 pro Sekunde). Dadurch verhält sich das
@@ -138,5 +154,7 @@ Kein Level hier hat ein Zeitfenster unter 96 ms; das leichteste beginnt bei 154 
 | --- | --- |
 | `node tools/solve.js` | beweist, dass jedes Level schaffbar ist, berechnet die Wertung und schreibt die Demos |
 | `node tools/smoke-test.js` | spielt das Spiel in einem unsichtbaren Chromium durch (braucht [Playwright](https://playwright.dev)) |
+| `node tools/quest-test.js` | prüft Quest-Format, Quest-Buch und Manifest (ohne Browser) |
+| `node tools/hub-test.js` | spielt Quests im Browser durch: Hauptspiel plus Würfelflug |
 | `node tools/build.js` | packt alles in eine einzige Datei `dist/wuerfelflug.html` zum Weitergeben |
 | `node tools/serve.js` | lokaler Webserver |

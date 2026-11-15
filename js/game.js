@@ -38,6 +38,13 @@
   function freshStats() {
     return { time: 0, tries: 0, pct: 0, clicks: 0, wins: 0, portals: 0, pickups: 0, flips: 0, levels: {} };
   }
+  // Was im laufenden Versuch passiert ist (für die Ereignisse ans Hauptspiel)
+  function freshTally() {
+    return { boost: 0, double: 0, shield: 0, shieldUsed: false, flips: 0 };
+  }
+  function copyTally(t) {
+    return { boost: t.boost, double: t.double, shield: t.shield, shieldUsed: t.shieldUsed, flips: t.flips };
+  }
 
   function start(hot) {
     var root = $('game');
@@ -151,6 +158,17 @@
     var shownPct = -1, shownTry = '';
     var toastTimer = 0;
 
+    // ---------- Anbindung ans Hauptspiel (js/embed.js, nur im <iframe>) ----------
+    var bridge = WF.bridge || null;
+    var tally = freshTally(), cpTally = null;
+    // Ereignis melden: nur beim echten Spielen, nicht in Demo und Menü
+    function emit(name, data) {
+      if (!bridge || G.demo || screen !== 'play') return;
+      data = data || {};
+      data.level = G.level.id;
+      bridge.emit(name, data);
+    }
+
     for (var li = 0; li < 16; li++) {
       G.fx.lines.push({ x: Math.random(), y: Math.random(), len: rand(1.2, 3.6), a: rand(0.1, 0.32), v: rand(1.3, 2.5) });
     }
@@ -260,6 +278,8 @@
             burst(e.x, e.y, 8, cssRgb(col), 0.6, true);
             sfx('flip', G.s.grav < 0);
             count('flips');
+            tally.flips++;
+            emit('flip');
             break;
           case 'fly':
             col = WF.draw.PORTAL_RGB.trick;
@@ -281,6 +301,8 @@
             toast(PICKUP_TEXT[p.kind], cssRgb(col));
             sfx('pickup');
             count('pickups');
+            tally[p.kind]++;
+            emit('pickup', { kind: p.kind });
             break;
           case 'shield':
             col = WF.draw.PICKUP_RGB.shield;
@@ -289,6 +311,8 @@
             if (!reduceMotion) G.fx.shake = 0.25;
             toast('Schild verbraucht', cssRgb(col));
             sfx('shield');
+            tally.shieldUsed = true;
+            emit('shield.used');
             break;
           case 'mode':
             col = WF.draw.PORTAL_RGB[p.mode];
@@ -300,6 +324,7 @@
             else toast(p.mode === 'plane' ? 'Flugmodus: Jeder Klick gibt Auftrieb' : 'Würfelmodus: Springen nur vom Boden', cssRgb(col));
             sfx('portal', p.mode === 'cube' ? 'cube' : 'plane');
             count('portals');
+            emit('portal', { mode: p.mode });
             break;
           case 'speed':
             col = WF.draw.SPEED_RGB[p.speed];
@@ -309,6 +334,7 @@
             lastSpeedIdx = p.speed;
             audio.music.setTempo(MUSIC_TEMPO[p.speed]);
             count('portals');
+            emit('speed', { speed: p.speed });
             break;
         }
       }
@@ -331,9 +357,12 @@
       if (useCheckpoint && cpState) {
         sim.copyState(cpState, G.s);
         cpNext = G.cpIndex + 1;
+        tally = copyTally(cpTally);
       } else {
         G.s = sim.createState();
         cpState = null;
+        tally = freshTally();
+        cpTally = null;
         G.cpIndex = -1;
         cpNext = 0;
       }
@@ -356,6 +385,7 @@
       // gespeichert wird erst in einem sicheren Moment (Würfel: am Boden)
       if (cpWaiting >= 0 && (s.mode === 'plane' || s.onGround)) {
         cpState = sim.copyState(s);
+        cpTally = copyTally(tally);
         G.cpIndex = cpWaiting;
         cpWaiting = -1;
         burst(cps[G.cpIndex].x, 1.3, 8, '#7ee8c0', 0.5, true);
@@ -387,6 +417,7 @@
       flash([255, 120, 110], 0.26);
       sfx('death');
       countAttempt(pct(), false);
+      emit('attempt.ended', { practice: G.practice, percent: Math.floor(pct()), attempt: attempts, finished: false });
       if (!G.demo && !G.practice) saveBest(G.level, pct());
       else if (!G.demo) saveStore();
     }
@@ -413,6 +444,14 @@
       flash([244, 236, 216], 0.2);
       sfx('finish');
       countAttempt(100, true);
+      emit('attempt.ended', { practice: G.practice, percent: 100, attempt: attempts, finished: true });
+      emit('level.completed', {
+        practice: G.practice, attempts: attempts,
+        seconds: Math.round(finishStep / C.STEPS_PER_SECOND * 100) / 100,
+        clicks: finishJumps,
+        augments: { total: tally.boost + tally.double + tally.shield, boost: tally.boost, double: tally.double, shield: tally.shield },
+        shieldUsed: tally.shieldUsed, flips: tally.flips
+      });
       if (!G.demo && !G.practice) saveBest(G.level, 100);
       if (!G.demo) saveStore();
     }
@@ -582,11 +621,12 @@
       startAttract();
     }
 
-    function startGame(idx, demo) {
+    // practice: true/false erzwingt den Übungsmodus (Hauptspiel), sonst gilt die Einstellung im Menü
+    function startGame(idx, demo, practice) {
       G.level = levels[idx];
       G.levelIdx = idx;
       G.demo = !!demo;
-      G.practice = !demo && store.practice;
+      G.practice = !demo && (typeof practice === 'boolean' ? practice : store.practice);
       demoSet = demoFor(G.level);
       attempts = 1;
       phase = 'run';
@@ -601,6 +641,7 @@
       audio.unlock();
       audio.music.start();
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      emit('run.started', { practice: G.practice });
       // Wer zum ersten Mal spielt, bekommt die Steuerung kurz eingeblendet
       if (!G.demo && !(store.best[levels[0].id] > 0)) toast('Klicken, tippen oder Leertaste: springen', IVORY);
     }
@@ -638,7 +679,7 @@
       el.statClicks.textContent = String(finishJumps);
       el.statTime.textContent = (finishStep / C.STEPS_PER_SECOND).toFixed(1).replace('.', ',') + ' s';
       el.completeNote.hidden = !G.practice;
-      el.btnNext.hidden = G.levelIdx >= levels.length - 1;
+      el.btnNext.hidden = G.levelIdx >= levels.length - 1 || !!(bridge && bridge.fixedLevel());
       setScreen('complete');
       audio.music.stop();
       el.completeCard.focus({ preventScroll: true });
@@ -837,9 +878,14 @@
     onClick(el.btnTakeover, function () { startGame(G.levelIdx, false); });
     onClick($('btnResume'), resumeGame);
     onClick($('btnRestart'), restartLevel);
-    onClick($('btnQuit'), showMenu);
+    // Im Hauptspiel mit festem Level heißt "Zum Menü": zurück ins Hauptspiel
+    function leave() {
+      showMenu();
+      if (bridge) bridge.left();
+    }
+    onClick($('btnQuit'), leave);
     onClick($('btnAgain'), function () { startGame(G.levelIdx, false); });
-    onClick($('btnMenu'), showMenu);
+    onClick($('btnMenu'), leave);
     onClick(el.btnNext, function () { startGame(Math.min(levels.length - 1, G.levelIdx + 1), false); });
 
     // Offene Seiten übernehmen Einstellungen, wenn das Spiel aktualisiert wird
@@ -857,6 +903,25 @@
     showMenu();
     lastT = window.performance.now();
     window.requestAnimationFrame(frame);
+
+    // Steuerung für js/embed.js
+    if (bridge) {
+      bridge.attach({
+        startLevel: function (id, practice) {
+          for (var i = 0; i < levels.length; i++) {
+            if (levels[i].id === id) {
+              startGame(i, false, practice);
+              return true;
+            }
+          }
+          return false;
+        },
+        pause: pauseGame,
+        resume: resumeGame,
+        menu: showMenu,
+        setMuted: setMuted
+      });
+    }
 
     // Für automatische Tests (tools/smoke-test.js)
     WF.debug = {
