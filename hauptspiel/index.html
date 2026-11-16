@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hauptspiel</title>
+<meta name="description" content="Vorläufiges Hauptspiel: Minispiele auswählen und spielen.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&amp;display=swap">
+<link rel="stylesheet" href="hauptspiel.css">
+</head>
+<body>
+<main class="start" id="start">
+  <header class="start-head">
+    <p class="eyebrow">Vorläufige Version</p>
+    <h1>Hauptspiel</h1>
+    <p class="lede">Wähle ein Minispiel. Was du dort schaffst, zählt für deine Quests.</p>
+  </header>
+
+  <div class="status" id="status" aria-label="Spielstand"></div>
+
+  <h2 id="gamesTitle">Minispiele</h2>
+  <ul class="games" id="games" aria-labelledby="gamesTitle"></ul>
+
+  <footer class="start-foot">
+    <a class="btn btn-small" href="../hub/">Quest-Buch öffnen</a>
+  </footer>
+</main>
+
+<section class="player" id="player" hidden aria-label="Minispiel">
+  <div class="player-bar">
+    <button class="btn btn-small" id="btnBack" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Zurück
+    </button>
+    <span class="player-title" id="playerTitle"></span>
+  </div>
+  <div class="player-stage" id="playerStage"></div>
+</section>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="../platform/minigame-protocol.js"></script>
+<script src="../platform/quests.js"></script>
+<script src="../js/manifest.js"></script>
+<script src="../hub/quests-wuerfelflug.js"></script>
+<script src="spiele.js"></script>
+<script src="hauptspiel.js"></script>
+</body>
+</html>

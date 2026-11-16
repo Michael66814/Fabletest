@@ -82,7 +82,8 @@ und meldet Ereignisse (Level geschafft, Augment eingesammelt, Schwerkraft gedreh
 Quests werden als Daten beschrieben und gegen diese Ereignisse geprüft.
 
 - Schnittstelle und Quest-Format: [`docs/minispiele-und-quests.md`](docs/minispiele-und-quests.md)
-- Test-Oberfläche mit Beispiel-Quests: `node tools/serve.js`, dann <http://localhost:8080/hub/>
+- Vorläufiges Hauptspiel mit Auswahl der Minispiele: `node tools/serve.js`, dann <http://localhost:8080/hauptspiel/>
+- Quest-Buch mit Beispiel-Quests: <http://localhost:8080/hub/>
 
 Allein geöffnet verhält sich Würfelflug wie vorher.
 
@@ -101,7 +102,8 @@ Allein geöffnet verhält sich Würfelflug wie vorher.
 | `js/demos.js` | Lösungen und Schwierigkeitswertung des Bots (wird erzeugt, nicht von Hand ändern) |
 | `js/manifest.js`, `js/embed.js` | Beschreibung fürs Hauptspiel und Anbindung im `<iframe>` |
 | `platform/` | Minispiel-Protokoll und Quest-Buch (für alle Minispiele gleich) |
-| `hub/` | Test-Oberfläche des Hauptspiels mit Beispiel-Quests |
+| `hauptspiel/` | vorläufiges Hauptspiel: Minispiele auswählen und spielen (Liste in `hauptspiel/spiele.js`) |
+| `hub/` | Quest-Buch mit Beispiel-Quests |
 | `docs/` | Schnittstelle und Quest-Format |
 | `tools/` | Prüf-Bot, Browser-Test, Webserver, Einzeldatei-Paket |
 
@@ -156,5 +158,6 @@ Kein Level hier hat ein Zeitfenster unter 96 ms; das leichteste beginnt bei 154 
 | `node tools/smoke-test.js` | spielt das Spiel in einem unsichtbaren Chromium durch (braucht [Playwright](https://playwright.dev)) |
 | `node tools/quest-test.js` | prüft Quest-Format, Quest-Buch und Manifest (ohne Browser) |
 | `node tools/hub-test.js` | spielt Quests im Browser durch: Hauptspiel plus Würfelflug |
+| `node tools/hauptspiel-test.js` | prüft das Hauptspiel: Auswahl, Spielen, Rückkehr, gemeinsamer Spielstand |
 | `node tools/build.js` | packt alles in eine einzige Datei `dist/wuerfelflug.html` zum Weitergeben |
 | `node tools/serve.js` | lokaler Webserver |
