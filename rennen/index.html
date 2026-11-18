@@ -64,13 +64,12 @@
   <!-- Tasten für Touch-Geräte -->
   <div class="touch" id="touch" hidden>
     <div class="touch-group">
-      <button class="tbtn" data-key="left" type="button" aria-label="Links"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="tbtn" data-key="right" type="button" aria-label="Rechts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="tbtn tbtn-steer" data-key="left" type="button" aria-label="Links"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="tbtn tbtn-steer" data-key="right" type="button" aria-label="Rechts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
     <div class="touch-group">
-      <button class="tbtn tbtn-small" data-key="turbo" type="button" aria-label="Turbo">Turbo</button>
       <button class="tbtn tbtn-brake" data-key="brake" type="button" aria-label="Bremse">Bremse</button>
-      <button class="tbtn tbtn-gas" data-key="gas" type="button" aria-label="Gas">Gas</button>
+      <button class="tbtn tbtn-gas" data-key="gas" type="button" aria-label="Gas, nach oben wischen für Turbo"><span class="gas-hint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 14l6-6 6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Turbo</span><span>Gas</span></button>
     </div>
   </div>
 
@@ -126,7 +125,7 @@
         <li>Neben der Fahrbahn bremst das Gras. Wer gegen die <b>Leitplanke</b> fährt, verliert viel Tempo.</li>
         <li>Zu schnell in der Kurve? Das Auto <b>rutscht</b> nach außen und radiert Tempo weg. Vorher bremsen ist schneller.</li>
         <li>Mit Gamepad: linker Stick lenkt, rechter Trigger Gas, linker Trigger Bremse, A-Taste Turbo.</li>
-        <li>Auf dem Handy: Tasten unten links lenken, unten rechts Gas, Bremse und Turbo.</li>
+        <li>Auf dem Handy: Tasten unten links lenken, unten rechts Bremse und Gas. Für den <b>Turbo</b> aufs Gaspedal drücken und den Finger nach oben schieben, solange du ihn oben hältst, läuft der Turbo.</li>
       </ul>
       <div class="dialog-actions">
         <button class="btn btn-primary" id="btnHelpClose" type="button">Schließen</button>

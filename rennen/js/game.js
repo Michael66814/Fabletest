@@ -154,8 +154,26 @@
 
   Array.prototype.forEach.call(document.querySelectorAll('.tbtn'), function (b) {
     var k = b.dataset.key;
-    var down = function (e) { e.preventDefault(); touchKeys[k] = true; b.classList.add('down'); RR.audio.unlock(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* egal */ } };
-    var up = function () { touchKeys[k] = false; b.classList.remove('down'); };
+    var startY = 0;
+    var down = function (e) {
+      e.preventDefault();
+      touchKeys[k] = true; b.classList.add('down'); RR.audio.unlock();
+      startY = e.clientY;
+      try { b.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+    };
+    var up = function () {
+      touchKeys[k] = false; b.classList.remove('down');
+      if (k === 'gas') { touchKeys.turbo = false; b.classList.remove('turbo'); }
+    };
+    // Gaspedal: Finger nach oben schieben schaltet den Turbo zu, zurückschieben wieder ab
+    if (k === 'gas') {
+      b.addEventListener('pointermove', function (e) {
+        if (!touchKeys.gas) return;
+        var lift = startY - e.clientY;
+        var on = touchKeys.turbo ? lift > 18 : lift > 36;
+        if (on !== !!touchKeys.turbo) { touchKeys.turbo = on; b.classList.toggle('turbo', on); }
+      });
+    }
     b.addEventListener('pointerdown', down);
     b.addEventListener('pointerup', up);
     b.addEventListener('pointercancel', up);
@@ -488,7 +506,7 @@
       return {
         screen: screen, phase: race && race.phase, time: race && race.time, attract: attract,
         track: race && race.track.name,
-        me: me && { s: me.s, d: me.d, v: me.v, lap: me.lap, place: me.place, dist: me.dist, finished: me.finished, offroad: me.offroad },
+        me: me && { s: me.s, d: me.d, v: me.v, lap: me.lap, place: me.place, dist: me.dist, finished: me.finished, offroad: me.offroad, turboOn: me.turboOn, turbo: me.turbo },
         leader: race && race.standings[0].name
       };
     },

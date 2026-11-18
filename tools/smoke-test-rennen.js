@@ -138,6 +138,20 @@ async function main() {
   await phone.dispatchEvent('.tbtn-gas', 'pointerdown', { pointerId: 1, clientX: box.x + 10, clientY: box.y + 10 });
   const ok = await phone.waitForFunction(() => globalThis.RR.debug.state().me.v > 1, null, { timeout: 30000 }).then(() => true, () => false);
   check('Handy: Gas-Taste gibt Tempo', ok);
+  check('Handy: ohne Wischen kein Turbo', !(await phone.evaluate(() => globalThis.RR.debug.state().me.turboOn)));
+  await phone.dispatchEvent('.tbtn-gas', 'pointermove', { pointerId: 1, clientX: box.x + 10, clientY: box.y - 50 });
+  await phone.waitForFunction(() => globalThis.RR.debug.state().me.turbo < 0.99, null, { timeout: 30000 }).catch(() => {});
+  let st = await phone.evaluate(() => globalThis.RR.debug.state().me);
+  check('Handy: Gas drücken und nach oben wischen zündet den Turbo', st.turboOn && st.turbo < 1, 'Turbo ' + Math.round(st.turbo * 100) + ' %');
+  check('Handy: Gaspedal zeigt den Turbo an', await phone.$eval('.tbtn-gas', b => b.classList.contains('turbo')));
+  await phone.dispatchEvent('.tbtn-gas', 'pointermove', { pointerId: 1, clientX: box.x + 10, clientY: box.y + 10 });
+  await phone.waitForFunction(() => !globalThis.RR.debug.state().me.turboOn, null, { timeout: 30000 }).catch(() => {});
+  st = await phone.evaluate(() => globalThis.RR.debug.state().me);
+  check('Handy: Finger zurück nach unten schaltet den Turbo ab, Gas bleibt', !st.turboOn && st.v > 1);
+  await phone.dispatchEvent('.tbtn-gas', 'pointerup', { pointerId: 1 });
+  const sizes = await phone.$$eval('.tbtn', bs => bs.map(b => { const r = b.getBoundingClientRect(); return [b.dataset.key, Math.round(r.width), Math.round(r.height), Math.round(r.left), Math.round(r.right)]; }));
+  const overlap = sizes.some((a, i) => sizes.some((b, j) => i < j && a[3] < b[4] && b[3] < a[4]));
+  check('Handy: Tasten groß genug und ohne Überlappung', !overlap && sizes.every(x => x[1] >= 76 && x[2] >= 96 && x[3] >= 0 && x[4] <= 390), sizes.map(x => x[0] + ' ' + x[1] + '×' + x[2]).join(', '));
   await phone.close();
 
   check('keine Fehler im Browser', errors.length === 0, errors.slice(0, 3).join(' | '));
