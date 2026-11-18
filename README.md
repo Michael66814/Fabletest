@@ -7,6 +7,9 @@ Trickwürfel), Pfeil-Tore ändern das Tempo, und Augments helfen ein Stück weit
 
 Kein Build-Schritt, keine Abhängigkeiten – reines HTML, CSS und JavaScript.
 
+Weiteres Minigame im Ordner `promptduell/`: **Prompt-Duell**, bei dem du eine KI per Prompt
+eine Vorlage nachbauen lässt – siehe [unten](#minigame-prompt-duell).
+
 ## Spielen
 
 `index.html` im Browser öffnen (Doppelklick genügt).
@@ -140,3 +143,53 @@ Kein Level hier hat ein Zeitfenster unter 96 ms; das leichteste beginnt bei 154 
 | `node tools/smoke-test.js` | spielt das Spiel in einem unsichtbaren Chromium durch (braucht [Playwright](https://playwright.dev)) |
 | `node tools/build.js` | packt alles in eine einzige Datei `dist/wuerfelflug.html` zum Weitergeben |
 | `node tools/serve.js` | lokaler Webserver |
+
+# Minigame: Prompt-Duell
+
+Du siehst eine Vorlage, ein Bild oder eine kleine 3D-Skulptur. Eine eingebaute Bau-KI
+soll sie nachbauen, sieht sie aber nie: Sie kennt nur deine Anweisungen. Je genauer du
+beschreibst, desto näher kommt ihr Nachbau dem Original.
+
+**Spielen:** Die KI läuft nur, wenn die Seite auf claude.ai geöffnet ist (dort darf eine
+veröffentlichte Seite Claude fragen). Als lokale Datei zeigt `promptduell/index.html` nur
+die Vorlagen. Beim ersten Prompt fragt claude.ai, ob die Seite Claude benutzen darf; die
+Anfragen zählen zum Kontingent dessen, der spielt.
+
+## Regeln
+
+- **4 Anweisungen** zu je höchstens **280 Zeichen**. Jede weitere Anweisung bessert den
+  letzten Nachbau nach („den Kreis weiter nach links“).
+- **Zeit:** Leicht 2 Minuten, Mittel 3, Schwer 4. Solange die KI baut, steht die Uhr.
+- **Abgeben** jederzeit; bei Zeitende wird automatisch bewertet.
+- **Wertung:** 60 % KI-Schiedsrichter (vergleicht Vorlage und Nachbau als Bilder und
+  begründet sein Urteil) plus 40 % Pixel-Vergleich, dazu +4 für jede nicht gebrauchte
+  Anweisung, höchstens 100.
+- **Zu zweit:** beide spielen nacheinander dieselbe Vorlage an einem Gerät, danach
+  werden die Nachbauten verglichen. Bei Gleichstand gewinnt, wer weniger Anweisungen brauchte.
+- **Bestenliste** je Vorlage (die besten 5) merkt sich der Browser.
+
+## Vorlagen
+
+| Stufe | Bilder | Skulpturen |
+| --- | --- | --- |
+| Leicht | Rote Sonne, Ampel, Schachbrett | Schneemann, Tisch mit Vase, Würfelturm |
+| Mittel | Haus am Hügel, Segelboot, Zwinkernder Smiley | Fliegenpilz, Rakete, Tannenbaum |
+| Schwer | Leuchtturm bei Sonnenuntergang, Bergsee, Stadt bei Nacht | Windmühle, Roboter, Leuchtturm |
+
+Bilder sind SVG (400 × 300), Skulpturen Listen aus Kugeln, Quadern, Zylindern, Kegeln und
+Ringen, dargestellt mit Three.js. Die Skulpturen lassen sich durch Ziehen drehen; Vorlage
+und Nachbau drehen sich gemeinsam.
+
+## Pixel-Vergleich
+
+Vorlage und Nachbau werden auf 80 × 60 und 20 × 15 Bildpunkte verkleinert und Punkt für
+Punkt nach Farbabstand verglichen (Skulpturen von vorn und schräg). Damit eine leere oder
+einfarbige Fläche nicht schon Punkte bringt, zählt nur, was besser ist als eine Fläche in
+der Durchschnittsfarbe der Vorlage bzw. als die leere Bühne.
+
+## Sicherheit
+
+Was die KI liefert, wird geprüft, bevor es angezeigt wird: Aus SVG werden Skripte,
+Ereignis-Attribute und eingebettete Fremdinhalte entfernt, und es wird nur als Bild
+(`<img>`) dargestellt. Skulpturen werden auf bekannte Formen, Zahlenbereiche und höchstens
+60 Teile begrenzt.

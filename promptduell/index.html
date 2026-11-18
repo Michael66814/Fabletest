@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prompt-Duell</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Bau eine Vorlage nach, indem du einer KI Anweisungen gibst, die die Vorlage nie zu sehen bekommt.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&amp;family=Instrument+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* Werkbank: Vorlage links, Nachbau rechts, darunter das Diktierpult für den Prompt.
+   Kühles Werkstattgrau, Kobalt für alles, was die KI tut, Signalrot für die Uhr. */
+:root {
+  --bg: #e9ecf1;
+  --surface: #ffffff;
+  --surface-2: #f4f6f9;
+  --ink: #14171d;
+  --muted: #5b6270;
+  --line: #d3d8e0;
+  --accent: #2c55e8;
+  --accent-ink: #ffffff;
+  --accent-soft: #dfe6fd;
+  --hot: #e5432a;
+  --good: #1f9d6a;
+  --gold: #c98a12;
+  --stage: #e3e7ee;
+  --shadow: 0 1px 2px rgba(20, 23, 29, .06), 0 8px 24px rgba(20, 23, 29, .06);
+  --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1217; --surface: #171b22; --surface-2: #1d222b; --ink: #eceff4; --muted: #9aa2b1;
+    --line: #2a313c; --accent: #7f9bff; --accent-ink: #0b1020; --accent-soft: #222c4d;
+    --hot: #ff6a52; --good: #3fcf96; --gold: #f0b43c; --stage: #1d222b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1217; --surface: #171b22; --surface-2: #1d222b; --ink: #eceff4; --muted: #9aa2b1;
+  --line: #2a313c; --accent: #7f9bff; --accent-ink: #0b1020; --accent-soft: #222c4d;
+  --hot: #ff6a52; --good: #3fcf96; --gold: #f0b43c; --stage: #1d222b;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+h1, h2, h3 { font-family: var(--font-display); margin: 0; line-height: 1.1; text-wrap: balance; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 1.1rem; font-weight: 700; }
+p { margin: 0; }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.label {
+  font-size: .75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+}
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Knöpfe */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-weight: 600; white-space: nowrap;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.08); }
+.btn-ghost { background: transparent; }
+
+/* Kopf */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.brand { display: flex; flex-direction: column; gap: 6px; }
+.brand h1 span { color: var(--accent); }
+.brand p { color: var(--muted); max-width: 60ch; }
+.ai-status {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); font-size: .875rem; color: var(--muted);
+}
+.ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.ai-status[data-state="ready"] .ai-dot { background: var(--good); }
+.ai-status[data-state="none"] .ai-dot { background: var(--hot); }
+
+.notice {
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--hot);
+  border-radius: 10px; padding: 12px 16px; color: var(--ink);
+}
+
+/* Menü */
+.setup {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px;
+  box-shadow: var(--shadow);
+}
+.field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface-2); cursor: pointer; font-weight: 600;
+}
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.names { display: flex; gap: 8px; flex-wrap: wrap; }
+.names input {
+  flex: 1 1 120px; min-width: 0; min-height: 40px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface-2);
+}
+.rules { color: var(--muted); font-size: .9rem; }
+.rules b { color: var(--ink); font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.card {
+  display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+}
+.card:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow); }
+.card:disabled { cursor: not-allowed; opacity: .6; }
+.thumb { aspect-ratio: 4 / 3; width: 100%; max-width: 100%; background: var(--stage); display: block; object-fit: cover; }
+.card-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; }
+.card-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent);
+}
+.best { font-size: .85rem; color: var(--muted); }
+.best b { color: var(--gold); font-family: var(--font-mono); }
+
+/* Werkbank */
+.bench-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.bench-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.clock {
+  font-family: var(--font-mono); font-size: 2.25rem; font-weight: 500; letter-spacing: -0.02em;
+  padding: 4px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums; min-width: 6ch; text-align: center;
+}
+.clock[data-low="true"] { color: var(--hot); border-color: var(--hot); }
+.clock[data-paused="true"] { color: var(--muted); }
+.clock-note { font-size: .8rem; color: var(--muted); text-align: center; }
+
+.easels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.easel {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px;
+}
+.easel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.canvas-box {
+  position: relative; aspect-ratio: 4 / 3; width: 100%; max-width: 100%;
+  background: var(--stage); border-radius: 10px; overflow: hidden;
+}
+.canvas-box img, .canvas-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.canvas-box canvas { cursor: grab; touch-action: none; }
+.canvas-empty {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px;
+  color: var(--muted); font-size: .95rem;
+}
+.building {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  background: color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter: blur(2px);
+  font-weight: 600; color: var(--accent);
+}
+.building span::after { content: ''; animation: dots 1.2s steps(4) infinite; }
+@keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+.hidden-badge {
+  font-size: .75rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center;
+}
+
+.desk {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px;
+}
+.dictate {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px;
+}
+.dictate textarea {
+  width: 100%; min-height: 110px; resize: vertical; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface-2); font-family: var(--font-mono); font-size: .9rem;
+  line-height: 1.5;
+}
+.dictate-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.charcount { font-size: .85rem; color: var(--muted); }
+.charcount[data-over="true"] { color: var(--hot); }
+.tokens { display: flex; gap: 6px; align-items: center; }
+.token { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); }
+.token[data-used="false"] { background: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.err { color: var(--hot); font-size: .9rem; }
+
+.log {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px;
+}
+.log ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 8px; }
+.log li { font-size: .9rem; overflow-wrap: anywhere; }
+.log li::marker { color: var(--accent); font-weight: 700; }
+.log-empty { color: var(--muted); font-size: .9rem; }
+
+/* Ergebnis */
+.result {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 20px; align-items: start;
+}
+.scorecard {
+  display: flex; flex-direction: column; gap: 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px;
+  box-shadow: var(--shadow);
+}
+.bigscore { font-family: var(--font-display); font-weight: 800; font-size: 4.5rem; line-height: 1; letter-spacing: -0.03em; }
+.bigscore small { font-size: 1.25rem; color: var(--muted); font-weight: 600; }
+.rows { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.rows div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.rows span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.verdict { display: flex; flex-direction: column; gap: 8px; }
+.verdict ul, .verdict ol { margin: 0; padding-left: 1.3em; font-size: .92rem; }
+.verdict .plus li::marker { color: var(--good); }
+.verdict .minus li::marker { color: var(--hot); }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compare figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.compare img { width: 100%; max-width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: var(--stage); border: 1px solid var(--line); }
+.compare figcaption { font-size: .85rem; color: var(--muted); }
+.board { display: flex; flex-direction: column; gap: 6px; }
+.board ol { margin: 0; padding-left: 1.4em; font-size: .92rem; }
+.board li span { font-family: var(--font-mono); color: var(--gold); }
+
+.handoff {
+  display: flex; flex-direction: column; gap: 14px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 28px;
+  box-shadow: var(--shadow); max-width: 640px;
+}
+.duel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.duel-side {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px;
+}
+.duel-side[data-win="true"] { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.duel-side img { width: 100%; max-width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: var(--stage); }
+.duel-side .score { font-family: var(--font-display); font-weight: 800; font-size: 2.5rem; line-height: 1; }
+
+.judging {
+  display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center;
+  padding: 48px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+}
+.gavel { width: 56px; height: 56px; border-radius: 50%; border: 4px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+  .easels, .desk, .result, .duel, .compare { grid-template-columns: 1fr; }
+  .easels { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .easel { padding: 8px; }
+  .clock { font-size: 1.75rem; }
+  .bigscore { font-size: 3.5rem; }
+}
+@media (max-width: 420px) {
+  .easels { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="label">Minigame</span>
+      <h1>Prompt-<span>Duell</span></h1>
+      <p>Die Bau-KI sieht die Vorlage nie. Sie kennt nur deine Worte. Beschreib so gut, dass ihr Nachbau dem Original möglichst nahe kommt.</p>
+    </div>
+    <div class="ai-status" id="aiStatus" data-state="pending" role="status">
+      <span class="ai-dot"></span><span id="aiStatusText">KI wird verbunden …</span>
+    </div>
+  </header>
+
+  <p class="notice" id="aiNotice" hidden></p>
+
+  <!-- Menü -->
+  <section id="screenMenu" class="screen" aria-labelledby="menuTitle">
+    <div class="setup">
+      <div class="field">
+        <span class="label">Vorlagen</span>
+        <div class="seg" id="segKind" role="group" aria-label="Art der Vorlage">
+          <button type="button" data-kind="bild" aria-pressed="true">Bilder</button>
+          <button type="button" data-kind="skulptur" aria-pressed="false">Skulpturen</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">Spieler</span>
+        <div class="seg" id="segMode" role="group" aria-label="Spielmodus">
+          <button type="button" data-mode="solo" aria-pressed="true">Allein</button>
+          <button type="button" data-mode="duell" aria-pressed="false">Zu zweit</button>
+        </div>
+        <div class="names">
+          <input id="name1" type="text" maxlength="16" placeholder="Dein Name" aria-label="Name Spieler 1">
+          <input id="name2" type="text" maxlength="16" placeholder="Name Spieler 2" aria-label="Name Spieler 2" hidden>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">Regeln</span>
+        <p class="rules" id="rulesText"></p>
+      </div>
+    </div>
+    <h2 id="menuTitle" style="margin-top:8px">Wähle eine Vorlage</h2>
+    <div class="grid" id="templateGrid" style="margin-top:12px"></div>
+  </section>
+
+  <!-- Werkbank -->
+  <section id="screenPlay" class="screen" hidden aria-labelledby="playTitle">
+    <div class="bench-head">
+      <div class="bench-title">
+        <span class="label" id="playWho"></span>
+        <h2 id="playTitle"></h2>
+      </div>
+      <div>
+        <div class="clock mono" id="clock">2:00</div>
+        <div class="clock-note" id="clockNote">Die Uhr steht, solange die KI baut.</div>
+      </div>
+    </div>
+    <div class="easels" style="margin-top:14px">
+      <div class="easel">
+        <div class="easel-head"><span class="label">Vorlage</span><span class="hidden-badge">für die KI unsichtbar</span></div>
+        <div class="canvas-box" id="targetBox"></div>
+      </div>
+      <div class="easel">
+        <div class="easel-head"><span class="label">Nachbau der KI</span><span class="hidden-badge" id="versionBadge"></span></div>
+        <div class="canvas-box" id="resultBox">
+          <div class="canvas-empty" id="resultEmpty">Noch leer. Schreib unten deine erste Anweisung.</div>
+          <div class="building" id="buildingOverlay" hidden><span>KI baut</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="desk" style="margin-top:16px">
+      <div class="dictate">
+        <div class="dictate-row">
+          <label class="label" for="promptInput" id="promptLabel">Anweisung an die Bau-KI</label>
+          <div class="tokens" id="tokens" aria-label="Verbleibende Prompts"></div>
+        </div>
+        <textarea id="promptInput" placeholder="Zum Beispiel: Blauer Hintergrund. In der Mitte ein großer roter Kreis, etwa halb so hoch wie das Bild."></textarea>
+        <div class="dictate-row">
+          <span class="charcount mono" id="charCount">0 / 280</span>
+          <div class="actions">
+            <button type="button" class="btn btn-ghost" id="btnStop" hidden>Stopp</button>
+            <button type="button" class="btn" id="btnSubmitRound">Abgeben</button>
+            <button type="button" class="btn btn-primary" id="btnSend">Bauen lassen</button>
+          </div>
+        </div>
+        <p class="err" id="playErr" hidden></p>
+      </div>
+      <div class="log">
+        <span class="label">Deine Anweisungen</span>
+        <ol id="promptLog"></ol>
+        <p class="log-empty" id="logEmpty">Jede Anweisung baut auf dem letzten Nachbau auf. Du kannst also nachbessern: „Den Kreis etwas weiter nach links.“</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bewertung läuft -->
+  <section id="screenJudging" class="screen" hidden>
+    <div class="judging">
+      <div class="gavel" aria-hidden="true"></div>
+      <h2>Der Schiedsrichter vergleicht</h2>
+      <p class="rules">Er legt Vorlage und Nachbau nebeneinander. Das dauert meist 10 bis 40 Sekunden.</p>
+    </div>
+  </section>
+
+  <!-- Ergebnis einer Runde -->
+  <section id="screenResult" class="screen" hidden aria-labelledby="resultTitle">
+    <div class="result">
+      <div class="scorecard">
+        <span class="label" id="resultWho"></span>
+        <h2 id="resultTitle"></h2>
+        <div class="bigscore" id="resultScore">0<small> / 100</small></div>
+        <div class="rows" id="resultRows"></div>
+        <div class="actions" id="resultActions"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="compare">
+          <figure><img id="cmpTarget" alt="Vorlage"><figcaption>Vorlage</figcaption></figure>
+          <figure><img id="cmpResult" alt="Nachbau der KI"><figcaption id="cmpResultCap">Nachbau</figcaption></figure>
+        </div>
+        <div class="verdict" id="verdict"></div>
+        <div class="board" id="board"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Übergabe im Duell -->
+  <section id="screenHandoff" class="screen" hidden>
+    <div class="handoff">
+      <span class="label">Spielerwechsel</span>
+      <h2 id="handoffTitle"></h2>
+      <p id="handoffText"></p>
+      <button type="button" class="btn btn-primary" id="btnHandoff">Los geht's</button>
+    </div>
+  </section>
+
+  <!-- Duell-Auswertung -->
+  <section id="screenDuel" class="screen" hidden aria-labelledby="duelTitle">
+    <span class="label">Duell-Ergebnis</span>
+    <h2 id="duelTitle" style="margin:6px 0 16px"></h2>
+    <div class="duel" id="duelSides"></div>
+    <div class="actions" style="margin-top:16px">
+      <button type="button" class="btn btn-primary" id="btnDuelAgain">Revanche mit neuer Vorlage</button>
+      <button type="button" class="btn" id="btnDuelMenu">Zum Menü</button>
+    </div>
+  </section>
+</div>
+
+<script>
+'use strict';
+
+/* ------------------------------------------------------------------
+   Vorlagen
+   Bilder sind SVG mit viewBox 0 0 400 300.
+   Skulpturen sind Listen aus Grundformen; y zeigt nach oben, der Boden liegt bei y = 0.
+   ------------------------------------------------------------------ */
+const W = 400, H = 300;
+const svg = (body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${body}</svg>`;
+
+const DIFF = {
+  leicht: { name: 'Leicht', seconds: 120 },
+  mittel: { name: 'Mittel', seconds: 180 },
+  schwer: { name: 'Schwer', seconds: 240 }
+};
+const MAX_PROMPTS = 4;
+const MAX_CHARS = 280;
+const BONUS_PER_PROMPT = 4;
+
+const IMAGE_TEMPLATES = [
+  { id: 'b-sonne', title: 'Rote Sonne', diff: 'leicht', svg: svg(
+    `<rect width="400" height="300" fill="#2f6fd6"/><circle cx="200" cy="150" r="72" fill="#e4352b"/>`) },
+  { id: 'b-ampel', title: 'Ampel', diff: 'leicht', svg: svg(
+    `<rect width="400" height="300" fill="#f1ede3"/><rect x="194" y="200" width="12" height="100" fill="#555"/>
+     <rect x="160" y="30" width="80" height="180" rx="16" fill="#222"/>
+     <circle cx="200" cy="72" r="24" fill="#e23b2e"/><circle cx="200" cy="120" r="24" fill="#f4c21b"/><circle cx="200" cy="168" r="24" fill="#2fb350"/>`) },
+  { id: 'b-schach', title: 'Schachbrett', diff: 'leicht', svg: svg(
+    `<rect width="400" height="300" fill="#3d8b4f"/>` +
+    Array.from({ length: 16 }, (_, i) => {
+      const x = i % 4, y = Math.floor(i / 4);
+      return `<rect x="${120 + x * 40}" y="${70 + y * 40}" width="40" height="40" fill="${(x + y) % 2 ? '#111' : '#fff'}"/>`;
+    }).join('')) },
+  { id: 'b-haus', title: 'Haus am Hügel', diff: 'mittel', svg: svg(
+    `<rect width="400" height="300" fill="#9fd3f5"/><circle cx="340" cy="56" r="30" fill="#ffd43b"/>
+     <ellipse cx="200" cy="330" rx="300" ry="120" fill="#5cb85c"/>
+     <rect x="140" y="140" width="120" height="90" fill="#f3e2c3"/><polygon points="128,142 200,82 272,142" fill="#c0392b"/>
+     <rect x="186" y="180" width="28" height="50" fill="#7a4a24"/><rect x="152" y="160" width="24" height="24" fill="#5dade2" stroke="#fff" stroke-width="3"/>
+     <rect x="224" y="160" width="24" height="24" fill="#5dade2" stroke="#fff" stroke-width="3"/>`) },
+  { id: 'b-boot', title: 'Segelboot', diff: 'mittel', svg: svg(
+    `<rect width="400" height="190" fill="#bfe3f7"/><rect y="190" width="400" height="110" fill="#1f5f99"/>
+     <path d="M120 190 L280 190 L258 222 L142 222 Z" fill="#7b4a23"/><rect x="198" y="70" width="5" height="120" fill="#4b2e14"/>
+     <polygon points="205,76 205,182 272,182" fill="#ffffff"/><polygon points="196,92 196,182 146,182" fill="#ff8c2b"/>
+     <path d="M60 60 q10 -10 20 0 q10 -10 20 0" fill="none" stroke="#333" stroke-width="3"/>
+     <path d="M300 40 q8 -8 16 0 q8 -8 16 0" fill="none" stroke="#333" stroke-width="3"/>`) },
+  { id: 'b-smiley', title: 'Zwinkernder Smiley', diff: 'mittel', svg: svg(
+    `<rect width="400" height="300" fill="#6b3fa0"/><circle cx="200" cy="150" r="110" fill="#ffd21f" stroke="#e0a800" stroke-width="6"/>
+     <ellipse cx="160" cy="120" rx="14" ry="22" fill="#2b1a00"/><path d="M226 122 q14 -12 30 0" fill="none" stroke="#2b1a00" stroke-width="8" stroke-linecap="round"/>
+     <path d="M135 175 q65 60 130 0" fill="none" stroke="#2b1a00" stroke-width="10" stroke-linecap="round"/>
+     <circle cx="130" cy="165" r="14" fill="#ff8a8a" opacity=".7"/><circle cx="270" cy="165" r="14" fill="#ff8a8a" opacity=".7"/>`) },
+  { id: 'b-leuchtturm', title: 'Leuchtturm bei Sonnenuntergang', diff: 'schwer', svg: svg(
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b1d5e"/><stop offset=".55" stop-color="#e2603a"/><stop offset="1" stop-color="#ffc35a"/></linearGradient></defs>
+     <rect width="400" height="210" fill="url(#g)"/><circle cx="90" cy="210" r="46" fill="#ffd77a"/>
+     <rect y="210" width="400" height="90" fill="#22406b"/><rect x="40" y="222" width="100" height="4" fill="#ffd77a" opacity=".6"/><rect x="60" y="236" width="70" height="3" fill="#ffd77a" opacity=".4"/>
+     <path d="M230 300 L250 232 L300 218 L360 236 L380 300 Z" fill="#2c2a2a"/>
+     <polygon points="280,226 320,226 312,110 288,110" fill="#f5f5f5"/>
+     <polygon points="283,196 317,196 315,170 285,170" fill="#d6322b"/><polygon points="286,148 314,148 312,124 288,124" fill="#d6322b"/>
+     <rect x="282" y="100" width="36" height="10" fill="#333"/><rect x="288" y="80" width="24" height="20" fill="#ffe680"/>
+     <polygon points="284,80 316,80 300,62" fill="#d6322b"/>
+     <polygon points="288,86 120,50 120,110" fill="#fff4b0" opacity=".35"/>`) },
+  { id: 'b-bergsee', title: 'Bergsee', diff: 'schwer', svg: svg(
+    `<rect width="400" height="170" fill="#cfe8fb"/>
+     <polygon points="0,170 90,60 170,170" fill="#6b7a8f"/><polygon points="90,60 70,85 82,82 92,92 104,80 112,84" fill="#fff"/>
+     <polygon points="120,170 240,30 360,170" fill="#56657c"/><polygon points="240,30 212,64 228,60 242,72 256,58 270,66" fill="#fff"/>
+     <polygon points="300,170 360,100 400,140 400,170" fill="#7d8ba0"/>
+     <rect y="170" width="400" height="130" fill="#3f7fb3"/>
+     <polygon points="0,170 90,262 170,170" fill="#6b7a8f" opacity=".45"/><polygon points="120,170 240,300 360,170" fill="#56657c" opacity=".45"/>
+     <g fill="#1f5a32"><polygon points="20,175 34,120 48,175"/><polygon points="44,175 56,132 68,175"/><polygon points="350,175 364,118 378,175"/><polygon points="372,175 384,138 396,175"/></g>`) },
+  { id: 'b-stadt', title: 'Stadt bei Nacht', diff: 'schwer', svg: svg(
+    `<rect width="400" height="300" fill="#0d1636"/><circle cx="320" cy="60" r="26" fill="#f4f1d0"/><circle cx="332" cy="52" r="24" fill="#0d1636"/>
+     <g fill="#fff"><circle cx="40" cy="40" r="2"/><circle cx="110" cy="70" r="1.5"/><circle cx="180" cy="30" r="2"/><circle cx="250" cy="90" r="1.5"/><circle cx="370" cy="120" r="2"/><circle cx="70" cy="110" r="1.5"/></g>
+     <rect x="20" y="170" width="60" height="130" fill="#26304f"/><rect x="90" y="120" width="50" height="180" fill="#1e2744"/>
+     <rect x="150" y="150" width="70" height="150" fill="#2d385c"/><rect x="230" y="95" width="45" height="205" fill="#1e2744"/><rect x="250" y="70" width="5" height="25" fill="#1e2744"/>
+     <rect x="285" y="160" width="95" height="140" fill="#26304f"/>
+     <g fill="#ffd25a">` + [[30,185],[55,205],[30,245],[100,140],[118,170],[100,220],[118,260],[162,170],[192,195],[162,230],[192,265],[240,115],[258,150],[240,200],[258,240],[300,180],[330,180],[355,210],[300,240],[330,270]]
+      .map(([x, y]) => `<rect x="${x}" y="${y}" width="12" height="14"/>`).join('') + `</g>`) }
+];
+
+// Grundformen: form, pos [x,y,z], groesse [x,y,z] (Durchmesser bzw. Kantenlängen), dreh [x,y,z] in Grad, farbe
+const P = (form, pos, groesse, farbe, dreh) => ({ form, pos, groesse, farbe, dreh: dreh || [0, 0, 0] });
+const SCULPTURE_TEMPLATES = [
+  { id: 's-schneemann', title: 'Schneemann', diff: 'leicht', parts: [
+    P('kugel', [0, 0.7, 0], [1.4, 1.4, 1.4], '#f4f6fa'), P('kugel', [0, 1.75, 0], [1.0, 1.0, 1.0], '#f4f6fa'),
+    P('kugel', [0, 2.55, 0], [0.7, 0.7, 0.7], '#f4f6fa'), P('kegel', [0, 2.55, 0.45], [0.14, 0.4, 0.14], '#ff7a1a', [90, 0, 0]),
+    P('kugel', [-0.13, 2.68, 0.3], [0.09, 0.09, 0.09], '#111111'), P('kugel', [0.13, 2.68, 0.3], [0.09, 0.09, 0.09], '#111111'),
+    P('zylinder', [0, 3.05, 0], [0.5, 0.45, 0.5], '#1b1b1b'), P('zylinder', [0, 2.85, 0], [0.8, 0.06, 0.8], '#1b1b1b')] },
+  { id: 's-tisch', title: 'Tisch mit Vase', diff: 'leicht', parts: [
+    P('quader', [0, 1.5, 0], [3, 0.15, 1.8], '#a0663a'),
+    P('quader', [-1.35, 0.72, -0.75], [0.15, 1.45, 0.15], '#7a4a26'), P('quader', [1.35, 0.72, -0.75], [0.15, 1.45, 0.15], '#7a4a26'),
+    P('quader', [-1.35, 0.72, 0.75], [0.15, 1.45, 0.15], '#7a4a26'), P('quader', [1.35, 0.72, 0.75], [0.15, 1.45, 0.15], '#7a4a26'),
+    P('zylinder', [0.6, 1.95, 0], [0.4, 0.75, 0.4], '#2c7be5')] },
+  { id: 's-turm', title: 'Würfelturm', diff: 'leicht', parts: [
+    P('quader', [0, 0.6, 0], [1.2, 1.2, 1.2], '#e23b2e'), P('quader', [0, 1.6, 0], [0.8, 0.8, 0.8], '#f4c21b', [0, 45, 0]),
+    P('quader', [0, 2.25, 0], [0.5, 0.5, 0.5], '#2fb350'), P('kugel', [0, 2.75, 0], [0.5, 0.5, 0.5], '#2c55e8')] },
+  { id: 's-pilz', title: 'Fliegenpilz', diff: 'mittel', parts: [
+    P('zylinder', [0, 0.8, 0], [0.7, 1.6, 0.7], '#f3ead8'), P('kugel', [0, 1.7, 0], [2.4, 1.1, 2.4], '#d4241c'),
+    P('kugel', [0.5, 2.15, 0.3], [0.25, 0.12, 0.25], '#ffffff'), P('kugel', [-0.4, 2.15, 0.45], [0.22, 0.1, 0.22], '#ffffff'),
+    P('kugel', [-0.2, 2.2, -0.5], [0.25, 0.12, 0.25], '#ffffff'), P('kugel', [0.75, 1.95, -0.4], [0.2, 0.1, 0.2], '#ffffff'),
+    P('ring', [0, 1.3, 0], [0.8, 0.8, 0.5], '#f3ead8', [90, 0, 0])] },
+  { id: 's-rakete', title: 'Rakete', diff: 'mittel', parts: [
+    P('zylinder', [0, 1.6, 0], [0.9, 2.2, 0.9], '#e8ecf2'), P('kegel', [0, 3.15, 0], [0.9, 0.9, 0.9], '#d6322b'),
+    P('quader', [0.55, 0.65, 0], [0.4, 0.8, 0.08], '#d6322b'), P('quader', [-0.55, 0.65, 0], [0.4, 0.8, 0.08], '#d6322b'),
+    P('quader', [0, 0.65, 0.55], [0.08, 0.8, 0.4], '#d6322b'), P('kugel', [0, 2.1, 0.42], [0.36, 0.36, 0.1], '#5dade2'),
+    P('kegel', [0, 0.3, 0], [0.6, 0.5, 0.6], '#ffb02e', [180, 0, 0])] },
+  { id: 's-baum', title: 'Tannenbaum', diff: 'mittel', parts: [
+    P('zylinder', [0, 0.4, 0], [0.4, 0.8, 0.4], '#6b4423'), P('kegel', [0, 1.3, 0], [2.2, 1.3, 2.2], '#1f7a3a'),
+    P('kegel', [0, 2.0, 0], [1.7, 1.1, 1.7], '#23893f'), P('kegel', [0, 2.65, 0], [1.1, 0.9, 1.1], '#2a9a48'),
+    P('kugel', [0, 3.2, 0], [0.3, 0.3, 0.3], '#ffd43b'), P('kugel', [0.6, 1.2, 0.55], [0.18, 0.18, 0.18], '#e23b2e'),
+    P('kugel', [-0.5, 1.9, 0.45], [0.16, 0.16, 0.16], '#2c55e8')] },
+  { id: 's-muehle', title: 'Windmühle', diff: 'schwer', parts: [
+    P('zylinder', [0, 1.2, 0], [1.4, 2.4, 1.4], '#d9c6a5'), P('kegel', [0, 2.85, 0], [1.6, 0.9, 1.6], '#8a3b2a'),
+    P('quader', [0, 0.45, 0.68], [0.4, 0.7, 0.1], '#5a3a1e'), P('zylinder', [0, 2.3, 0.85], [0.18, 0.4, 0.18], '#444444', [90, 0, 0]),
+    P('quader', [0, 2.3, 1.05], [0.3, 3.2, 0.06], '#f4f1ea', [0, 0, 20]), P('quader', [0, 2.3, 1.05], [0.3, 3.2, 0.06], '#f4f1ea', [0, 0, 110]),
+    P('quader', [0, 1.7, 0.71], [0.3, 0.3, 0.06], '#5dade2')] },
+  { id: 's-roboter', title: 'Roboter', diff: 'schwer', parts: [
+    P('quader', [0, 1.75, 0], [1.3, 1.3, 0.8], '#8d99ae'), P('quader', [0, 2.75, 0], [0.8, 0.65, 0.65], '#adb5c4'),
+    P('kugel', [-0.18, 2.8, 0.33], [0.16, 0.16, 0.08], '#3fe0ff'), P('kugel', [0.18, 2.8, 0.33], [0.16, 0.16, 0.08], '#3fe0ff'),
+    P('zylinder', [0, 3.25, 0], [0.06, 0.35, 0.06], '#444444'), P('kugel', [0, 3.45, 0], [0.16, 0.16, 0.16], '#e23b2e'),
+    P('zylinder', [-0.85, 1.75, 0], [0.25, 1.2, 0.25], '#5c677d', [0, 0, 20]), P('zylinder', [0.85, 1.75, 0], [0.25, 1.2, 0.25], '#5c677d', [0, 0, -20]),
+    P('quader', [-0.32, 0.55, 0], [0.32, 1.1, 0.4], '#5c677d'), P('quader', [0.32, 0.55, 0], [0.32, 1.1, 0.4], '#5c677d'),
+    P('quader', [0, 1.85, 0.42], [0.5, 0.3, 0.04], '#ffb02e')] },
+  { id: 's-leuchtturm', title: 'Leuchtturm', diff: 'schwer', parts: [
+    P('kugel', [0.3, 0.15, 0.2], [2.6, 0.6, 2.2], '#5b5550'), P('zylinder', [0, 0.8, 0], [1.0, 0.9, 1.0], '#f5f5f5'),
+    P('zylinder', [0, 1.6, 0], [0.9, 0.7, 0.9], '#d6322b'), P('zylinder', [0, 2.3, 0], [0.82, 0.7, 0.82], '#f5f5f5'),
+    P('zylinder', [0, 2.9, 0], [0.76, 0.5, 0.76], '#d6322b'), P('ring', [0, 3.15, 0], [1.0, 1.0, 0.5], '#333333', [90, 0, 0]),
+    P('zylinder', [0, 3.4, 0], [0.5, 0.5, 0.5], '#ffe680'), P('kegel', [0, 3.9, 0], [0.7, 0.5, 0.7], '#d6322b')] }
+];
+
+/* ------------------------------------------------------------------
+   Kleine Helfer
+   ------------------------------------------------------------------ */
+const $ = (id) => document.getElementById(id);
+const el = (tag, props, ...kids) => {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+};
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const svgUrl = (s) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* kein Speicher */ } }
+};
+const BEST_KEY = 'promptduell.best.v1';
+const ERR_TEXT = {
+  not_granted: 'Die Seite darf die KI nicht benutzen. Erlaube es über das Menü der Seite und lade sie neu.',
+  sampling_disabled: 'Für dein Konto ist die KI hier nicht verfügbar.',
+  rate_limited: 'Zu viele Anfragen in kurzer Zeit oder dein Kontingent ist erreicht. Warte kurz und versuch es noch einmal.',
+  session_expired: 'Du bist abgemeldet. Melde dich bei claude.ai wieder an.',
+  refused: 'Die KI hat diese Anweisung abgelehnt. Formuliere sie anders.',
+  empty_completion: 'Die KI hat nichts geliefert. Formuliere die Anweisung etwas einfacher.',
+  invalid_json: 'Die Antwort der KI war unbrauchbar. Versuch es noch einmal.',
+  upstream_error: 'Die Verbindung zur KI ist abgebrochen. Versuch es noch einmal.'
+};
+const errText = (e) => ERR_TEXT[e && e.code] || ERR_TEXT.upstream_error;
+const HARD_FAIL = new Set(['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed']);
+
+/* ------------------------------------------------------------------
+   KI anbinden
+   ------------------------------------------------------------------ */
+let sample = null;
+let canSendImages = false;
+let aiState = 'pending';
+
+function setAiState(state, text) {
+  aiState = state;
+  $('aiStatus').dataset.state = state;
+  $('aiStatusText').textContent = text;
+  const notice = $('aiNotice');
+  if (state === 'none') {
+    notice.hidden = false;
+    notice.textContent = 'Die Bau-KI läuft nur, wenn das Spiel auf claude.ai geöffnet ist. Hier kannst du dir die Vorlagen ansehen, aber nicht spielen.';
+  } else notice.hidden = true;
+  renderTemplates();
+}
+
+async function connectAi() {
+  if (!window.claude || typeof window.claude.use !== 'function') { setAiState('none', 'KI nicht verfügbar'); return; }
+  try {
+    sample = await window.claude.use('sample');
+  } catch (e) { sample = null; }
+  if (!sample) { setAiState('none', 'KI nicht verfügbar'); return; }
+  try {
+    const lim = await sample.limits();
+    canSendImages = !!(lim && lim.images);
+  } catch (e) { canSendImages = false; }
+  setAiState('ready', 'KI bereit');
+}
+
+function aiBlocked(e) {
+  if (e && HARD_FAIL.has(e.code)) {
+    setAiState('none', 'KI nicht erlaubt');
+    $('aiNotice').textContent = errText(e);
+  }
+}
+
+/* ------------------------------------------------------------------
+   3D: ein gemeinsamer Renderer, dessen Bild in sichtbare Canvas kopiert wird
+   ------------------------------------------------------------------ */
+const has3d = typeof THREE !== 'undefined' && (() => {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl') || c.getContext('experimental-webgl')); } catch (e) { return false; }
+})();
+let gl = null;
+const STAGE_BG = 0xe2e6ed;
+
+function initGl() {
+  if (gl || !has3d) return gl;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(STAGE_BG);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+  sun.position.set(4, 8, 6);
+  scene.add(sun);
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(3.2, 48), new THREE.MeshStandardMaterial({ color: 0x8f97a4, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+  const camera = new THREE.PerspectiveCamera(40, W / H, 0.1, 100);
+  const holder = new THREE.Group();
+  scene.add(holder);
+  gl = { renderer, scene, camera, holder, cache: new Map() };
+  return gl;
+}
+
+const GEOS = {};
+function geo(form) {
+  if (GEOS[form]) return GEOS[form];
+  switch (form) {
+    case 'quader': GEOS[form] = new THREE.BoxGeometry(1, 1, 1); break;
+    case 'zylinder': GEOS[form] = new THREE.CylinderGeometry(0.5, 0.5, 1, 32); break;
+    case 'kegel': GEOS[form] = new THREE.ConeGeometry(0.5, 1, 32); break;
+    case 'ring': GEOS[form] = new THREE.TorusGeometry(0.4, 0.1, 16, 40); break;
+    default: GEOS[form] = new THREE.SphereGeometry(0.5, 32, 20);
+  }
+  return GEOS[form];
+}
+
+function buildGroup(parts) {
+  const g = new THREE.Group();
+  for (const p of parts) {
+    const m = new THREE.Mesh(geo(p.form), new THREE.MeshStandardMaterial({ color: new THREE.Color(p.farbe), roughness: 0.6, metalness: 0.05 }));
+    m.position.set(p.pos[0], p.pos[1], p.pos[2]);
+    m.scale.set(p.groesse[0], p.groesse[1], p.groesse[2]);
+    const d = Math.PI / 180;
+    m.rotation.set(p.dreh[0] * d, p.dreh[1] * d, p.dreh[2] * d);
+    g.add(m);
+  }
+  return g;
+}
+
+// Zeichnet eine Skulptur aus dem Blickwinkel yaw (Grad) in ein 2D-Ziel
+function renderParts(parts, yaw, target, w, h) {
+  const g = initGl();
+  if (!g) return;
+  let group = g.cache.get(parts);
+  if (!group) { group = buildGroup(parts); g.cache.set(parts, group); }
+  g.holder.clear();
+  g.holder.add(group);
+  g.renderer.setSize(w, h, false);
+  g.camera.aspect = w / h;
+  g.camera.updateProjectionMatrix();
+  const r = 8.2, a = yaw * Math.PI / 180;
+  g.camera.position.set(Math.sin(a) * r, 3.6, Math.cos(a) * r);
+  g.camera.lookAt(0, 1.6, 0);
+  g.renderer.render(g.scene, g.camera);
+  const ctx = target.getContext('2d');
+  ctx.drawImage(g.renderer.domElement, 0, 0, target.width, target.height);
+}
+
+function partsToCanvas(parts, yaw, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  renderParts(parts, yaw, c, w, h);
+  return c;
+}
+
+// Zwei Ansichten nebeneinander: von vorn und schräg
+function partsComposite(parts, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w * 2; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(partsToCanvas(parts, 0, w, h), 0, 0);
+  ctx.drawImage(partsToCanvas(parts, 55, w, h), w, 0);
+  return c;
+}
+
+/* ------------------------------------------------------------------
+   SVG und Skulpturen aus KI-Antworten prüfen
+   ------------------------------------------------------------------ */
+function cleanSvg(text) {
+  const m = String(text || '').match(/<svg[\s\S]*<\/svg>/i);
+  if (!m) return null;
+  let doc;
+  try { doc = new DOMParser().parseFromString(m[0], 'image/svg+xml'); } catch (e) { return null; }
+  const root = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() !== 'svg' || doc.getElementsByTagName('parsererror').length) return null;
+  for (const bad of root.querySelectorAll('script, foreignObject, image, iframe, use[href^="http"]')) bad.remove();
+  for (const node of root.querySelectorAll('*')) {
+    for (const at of [...node.attributes]) if (/^on/i.test(at.name)) node.removeAttribute(at.name);
+  }
+  root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  if (!root.getAttribute('viewBox')) root.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  root.setAttribute('width', W);
+  root.setAttribute('height', H);
+  return new XMLSerializer().serializeToString(root);
+}
+
+const FORMS = new Set(['kugel', 'quader', 'zylinder', 'kegel', 'ring']);
+const FORM_ALIAS = { sphere: 'kugel', box: 'quader', wuerfel: 'quader', würfel: 'quader', cylinder: 'zylinder', cone: 'kegel', torus: 'ring' };
+function cleanParts(data) {
+  const list = Array.isArray(data) ? data : (data && (data.teile || data.parts));
+  if (!Array.isArray(list)) return null;
+  const num = (v, d, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? clamp(n, lo, hi) : d; };
+  const vec = (v, d, lo, hi) => [0, 1, 2].map((i) => num(Array.isArray(v) ? v[i] : undefined, d[i], lo, hi));
+  const out = [];
+  for (const p of list.slice(0, 60)) {
+    if (!p || typeof p !== 'object') continue;
+    let form = String(p.form || '').toLowerCase();
+    form = FORM_ALIAS[form] || form;
+    if (!FORMS.has(form)) continue;
+    let farbe = String(p.farbe || '#999999');
+    if (!/^#[0-9a-f]{6}$/i.test(farbe) && !/^#[0-9a-f]{3}$/i.test(farbe)) farbe = '#999999';
+    out.push({
+      form,
+      pos: vec(p.pos, [0, 0.5, 0], -6, 8),
+      groesse: vec(p.groesse, [1, 1, 1], 0.02, 8),
+      dreh: vec(p.dreh, [0, 0, 0], -360, 360),
+      farbe
+    });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------
+   Pixel-Vergleich
+   Ähnlichkeit pro Bildpunkt, in zwei Auflösungen. Damit ein leeres Bild nicht schon
+   Punkte bekommt, wird gegen eine Grundlinie gerechnet: eine einfarbige Fläche
+   in der Durchschnittsfarbe der Vorlage (Bilder) bzw. die leere Bühne (Skulpturen).
+   ------------------------------------------------------------------ */
+function pixels(src, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h).data;
+}
+function similarity(a, b) {
+  let sum = 0;
+  const n = a.length / 4;
+  for (let i = 0; i < a.length; i += 4) {
+    const dr = a[i] - b[i], dg = a[i + 1] - b[i + 1], db = a[i + 2] - b[i + 2];
+    sum += Math.sqrt(dr * dr + dg * dg + db * db) / 441.7;
+  }
+  return 1 - sum / n;
+}
+function flatLike(a) {
+  let r = 0, g = 0, b = 0;
+  const n = a.length / 4;
+  for (let i = 0; i < a.length; i += 4) { r += a[i]; g += a[i + 1]; b += a[i + 2]; }
+  const out = new Uint8ClampedArray(a.length);
+  for (let i = 0; i < a.length; i += 4) { out[i] = r / n; out[i + 1] = g / n; out[i + 2] = b / n; out[i + 3] = 255; }
+  return out;
+}
+const SIZES = [[80, 60], [20, 15]];
+const EMPTY_PARTS = [];
+function pixelScore(targets, results, baselines) {
+  // targets/results/baselines: Listen von Bildquellen, gleiche Länge
+  let sim = 0, base = 0, count = 0;
+  for (let k = 0; k < targets.length; k++) {
+    for (const [w, h] of SIZES) {
+      const t = pixels(targets[k], w, h);
+      const r = pixels(results[k], w, h);
+      const b = baselines ? pixels(baselines[k], w, h) : flatLike(t);
+      sim += similarity(t, r);
+      base += similarity(t, b);
+      count++;
+    }
+  }
+  sim /= count; base /= count;
+  const rel = clamp((sim - base) / Math.max(0.02, 1 - base), 0, 1);
+  return Math.round(100 * Math.pow(rel, 0.7));
+}
+function loadImg(url) {
+  return new Promise((ok, fail) => {
+    const i = new Image();
+    i.onload = () => ok(i);
+    i.onerror = () => fail(new Error('Bild nicht lesbar'));
+    i.src = url;
+  });
+}
+function canvasBlob(c) { return new Promise((ok) => c.toBlob((b) => ok(b), 'image/png')); }
+async function svgCanvas(s, w, h) {
+  const img = await loadImg(svgUrl(s));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  return c;
+}
+
+/* ------------------------------------------------------------------
+   Spielzustand
+   ------------------------------------------------------------------ */
+const game = {
+  kind: 'bild',
+  mode: 'solo',
+  names: ['', ''],
+  turn: 0,
+  template: null,
+  results: [],
+  round: null
+};
+
+function templates() { return game.kind === 'bild' ? IMAGE_TEMPLATES : SCULPTURE_TEMPLATES; }
+function playerName(i) {
+  const n = (game.names[i] || '').trim();
+  return n || (game.mode === 'duell' ? 'Spieler ' + (i + 1) : 'Du');
+}
+
+function show(id) {
+  for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
+  window.scrollTo({ top: 0 });
+}
+
+/* ------------------------------------------------------------------
+   Menü
+   ------------------------------------------------------------------ */
+const thumbCache = new Map();
+function thumbFor(t) {
+  if (thumbCache.has(t.id)) return thumbCache.get(t.id);
+  let url = '';
+  if (t.svg) url = svgUrl(t.svg);
+  else if (has3d) url = partsToCanvas(t.parts, 25, 320, 240).toDataURL('image/png');
+  thumbCache.set(t.id, url);
+  return url;
+}
+
+function bestOf(id) {
+  const list = store.get(BEST_KEY, {})[id];
+  return list && list.length ? list[0] : null;
+}
+
+function renderRules() {
+  $('rulesText').innerHTML = '';
+  $('rulesText').append(
+    el('b', { text: MAX_PROMPTS + ' Anweisungen' }), ' zu je höchstens ', el('b', { text: MAX_CHARS + ' Zeichen' }),
+    '. Zeit: 2, 3 oder 4 Minuten je nach Stufe. Am Ende zählen KI-Schiedsrichter (60 %) und Pixel-Vergleich (40 %). Jede nicht gebrauchte Anweisung bringt ',
+    el('b', { text: '+' + BONUS_PER_PROMPT }), '.'
+  );
+}
+
+function renderTemplates() {
+  const grid = $('templateGrid');
+  grid.innerHTML = '';
+  const order = { leicht: 0, mittel: 1, schwer: 2 };
+  const list = [...templates()].sort((a, b) => order[a.diff] - order[b.diff]);
+  for (const t of list) {
+    const url = thumbFor(t);
+    const best = bestOf(t.id);
+    const btn = el('button', { type: 'button', class: 'card' },
+      url ? el('img', { class: 'thumb', src: url, alt: '' }) : el('div', { class: 'thumb' }),
+      el('div', { class: 'card-body' },
+        el('div', { class: 'card-row' }, el('h3', { text: t.title }), el('span', { class: 'pill', text: DIFF[t.diff].name })),
+        el('span', { class: 'best' }, best
+          ? el('span', null, 'Bestwert ', el('b', { text: String(best.score) }), ' von ' + best.name)
+          : 'Noch kein Ergebnis · ' + fmtTime(DIFF[t.diff].seconds) + ' Min.')
+      ));
+    const noGl = game.kind === 'skulptur' && !has3d;
+    btn.disabled = aiState !== 'ready' || noGl;
+    if (noGl) btn.title = 'Dein Browser kann kein WebGL darstellen.';
+    btn.addEventListener('click', () => startMatch(t));
+    grid.append(btn);
+  }
+}
+
+function bindSeg(segId, attr, onPick) {
+  const seg = $(segId);
+  seg.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    for (const x of seg.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+    onPick(b.dataset[attr]);
+  });
+}
+
+/* ------------------------------------------------------------------
+   Runde
+   ------------------------------------------------------------------ */
+let yaw = 25;
+let dragging = null;
+let spinRaf = 0;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function startMatch(t) {
+  game.names = [$('name1').value, $('name2').value];
+  game.template = t;
+  game.turn = 0;
+  game.results = [];
+  startRound();
+}
+
+function startRound() {
+  const t = game.template;
+  game.round = {
+    prompts: [],
+    code: null,
+    timeLeft: DIFF[t.diff].seconds,
+    building: false,
+    ctl: null,
+    timeUp: false,
+    finished: false,
+    last: performance.now()
+  };
+  $('playTitle').textContent = t.title;
+  $('playWho').textContent = (game.mode === 'duell' ? playerName(game.turn) + ' · ' : '') + DIFF[t.diff].name;
+  $('promptInput').value = '';
+  $('playErr').hidden = true;
+  $('promptInput').placeholder = game.kind === 'bild'
+    ? 'Zum Beispiel: Blauer Hintergrund. In der Mitte ein großer roter Kreis, etwa halb so hoch wie das Bild.'
+    : 'Zum Beispiel: Drei weiße Kugeln übereinander, unten die größte. Oben ein schwarzer Zylinder als Hut.';
+  setupBoxes();
+  updatePlayUi();
+  show('screenPlay');
+  $('promptInput').focus();
+  clearInterval(game.timer);
+  game.timer = setInterval(tick, 200);
+}
+
+function setupBoxes() {
+  const tb = $('targetBox'), rb = $('resultBox');
+  tb.querySelectorAll('img, canvas').forEach((n) => n.remove());
+  rb.querySelectorAll('img, canvas').forEach((n) => n.remove());
+  cancelAnimationFrame(spinRaf);
+  if (game.kind === 'bild') {
+    tb.prepend(el('img', { src: svgUrl(game.template.svg), alt: 'Vorlage: ' + game.template.title }));
+  } else {
+    const ct = el('canvas', { width: W * 2, height: H * 2, 'aria-label': 'Vorlage, zum Drehen ziehen' });
+    const cr = el('canvas', { width: W * 2, height: H * 2, 'aria-label': 'Nachbau, zum Drehen ziehen' });
+    tb.prepend(ct);
+    rb.prepend(cr);
+    for (const c of [ct, cr]) {
+      c.addEventListener('pointerdown', (e) => { dragging = { x: e.clientX, yaw }; c.setPointerCapture(e.pointerId); });
+      c.addEventListener('pointermove', (e) => { if (dragging) { yaw = dragging.yaw - (e.clientX - dragging.x) * 0.5; draw3d(); } });
+      c.addEventListener('pointerup', () => { dragging = null; });
+      c.addEventListener('pointercancel', () => { dragging = null; });
+    }
+    yaw = 25;
+    draw3d();
+    if (!reduceMotion) spin();
+  }
+}
+
+function spin() {
+  spinRaf = requestAnimationFrame(spin);
+  if ($('screenPlay').hidden || dragging) return;
+  yaw += 0.15;
+  draw3d();
+}
+
+function draw3d() {
+  const ct = $('targetBox').querySelector('canvas');
+  const cr = $('resultBox').querySelector('canvas');
+  if (!ct || !cr) return;
+  renderParts(game.template.parts, yaw, ct, W * 2, H * 2);
+  const code = game.round && game.round.code;
+  if (code) { cr.hidden = false; renderParts(code, yaw, cr, W * 2, H * 2); }
+  else cr.hidden = true;
+}
+
+function showResultImage() {
+  const r = game.round, rb = $('resultBox');
+  $('resultEmpty').hidden = !!r.code;
+  if (game.kind === 'bild') {
+    rb.querySelectorAll('img').forEach((n) => n.remove());
+    if (r.code) rb.prepend(el('img', { src: svgUrl(r.code), alt: 'Nachbau der KI' }));
+  } else draw3d();
+  $('versionBadge').textContent = r.code ? 'Fassung ' + r.prompts.length : '';
+}
+
+function updatePlayUi() {
+  const r = game.round;
+  const used = r.prompts.length;
+  const tokens = $('tokens');
+  tokens.innerHTML = '';
+  for (let i = 0; i < MAX_PROMPTS; i++) tokens.append(el('span', { class: 'token', 'data-used': String(i < used) }));
+  tokens.setAttribute('aria-label', (MAX_PROMPTS - used) + ' von ' + MAX_PROMPTS + ' Anweisungen übrig');
+  const len = $('promptInput').value.length;
+  $('charCount').textContent = len + ' / ' + MAX_CHARS;
+  $('charCount').dataset.over = String(len > MAX_CHARS);
+  const left = MAX_PROMPTS - used;
+  $('btnSend').disabled = r.building || left <= 0 || len === 0 || len > MAX_CHARS || r.timeLeft <= 0;
+  $('btnSend').textContent = used === 0 ? 'Bauen lassen' : 'Nachbessern lassen';
+  $('btnSubmitRound').disabled = r.building || !r.code;
+  $('btnStop').hidden = !r.building;
+  $('promptInput').disabled = left <= 0 || r.timeLeft <= 0;
+  $('promptLabel').textContent = left <= 0 ? 'Keine Anweisungen mehr übrig' : (used === 0 ? 'Anweisung an die Bau-KI' : 'Nachbesserung ' + (used + 1) + ' von ' + MAX_PROMPTS);
+  $('buildingOverlay').hidden = !r.building;
+  const log = $('promptLog');
+  log.innerHTML = '';
+  for (const p of r.prompts) log.append(el('li', { text: p }));
+  $('logEmpty').hidden = used > 0;
+  renderClock();
+}
+
+function renderClock() {
+  const r = game.round;
+  $('clock').textContent = fmtTime(r.timeLeft);
+  $('clock').dataset.low = String(r.timeLeft <= 20);
+  $('clock').dataset.paused = String(r.building);
+  $('clockNote').textContent = r.building ? 'Uhr steht, die KI baut gerade.' : 'Die Uhr steht, solange die KI baut.';
+}
+
+function tick() {
+  const r = game.round;
+  if (!r || r.finished) return;
+  const now = performance.now();
+  const dt = (now - r.last) / 1000;
+  r.last = now;
+  if (r.building) return;
+  r.timeLeft = Math.max(0, r.timeLeft - dt);
+  renderClock();
+  if (r.timeLeft <= 0) {
+    r.timeUp = true;
+    finishRound();
+  }
+}
+
+function buildPrompt(r, instruction) {
+  const history = r.prompts.map((p, i) => `${i + 1}. ${p}`).join('\n');
+  if (game.kind === 'bild') {
+    const base = `Du bist die Bau-KI im Spiel „Prompt-Duell“. Ein Spieler beschreibt dir ein Bild, das du selbst nie siehst. Setze seine Beschreibung so genau und wörtlich wie möglich als SVG um.
+
+Regeln:
+- Genau ein <svg>-Element mit xmlns="http://www.w3.org/2000/svg", width="400", height="300", viewBox="0 0 400 300".
+- Nur rect, circle, ellipse, line, polyline, polygon, path, text, g, defs, linearGradient, radialGradient, stop.
+- Keine Skripte, keine externen Bilder, keine Animation.
+- Füll immer den ganzen Hintergrund, notfalls weiß.
+- Füge nichts Wesentliches hinzu, das nicht verlangt ist. Was offen bleibt, löst du so schlicht und naheliegend wie möglich.
+- Antworte nur mit dem SVG-Code, ohne Erklärung.`;
+    if (!r.code) return `${base}\n\nAnweisung des Spielers:\n${instruction}`;
+    return `${base}\n\nBisherige Anweisungen des Spielers:\n${history}\n\nDein bisheriges Bild:\n${r.code}\n\nNeue Anweisung des Spielers:\n${instruction}\n\nÄndere dein bisheriges Bild gemäß der neuen Anweisung. Alles, was die neue Anweisung nicht betrifft, bleibt so, wie es ist. Gib das vollständige neue SVG aus.`;
+  }
+  const base = `Du bist die Bau-KI im Spiel „Prompt-Duell“. Ein Spieler beschreibt dir eine kleine Skulptur, die du selbst nie siehst. Baue sie aus Grundformen so genau und wörtlich wie möglich nach.
+
+Koordinaten: y zeigt nach oben, der Boden liegt bei y = 0, die Kamera schaut von vorn (von +z) auf die Mitte. Die Bühne ist eine runde Fläche mit Radius 3 um den Ursprung; die meisten Skulpturen sind 2 bis 4 Einheiten hoch.
+
+Formen (alle mit Mittelpunkt bei pos):
+- "kugel": groesse = Durchmesser in x, y, z (ungleiche Werte ergeben ein Ellipsoid)
+- "quader": groesse = Kantenlängen in x, y, z
+- "zylinder": senkrecht stehend; groesse = [Durchmesser, Höhe, Durchmesser]
+- "kegel": senkrecht, Spitze nach oben; groesse = [Durchmesser, Höhe, Durchmesser]
+- "ring": Torus in der x-y-Ebene; groesse skaliert ihn (Außendurchmesser bei groesse 1 etwa 1)
+dreh = Drehung in Grad um x, y, z. farbe = "#rrggbb".
+
+Höchstens 40 Teile. Füge nichts Wesentliches hinzu, das nicht verlangt ist. Was offen bleibt, löst du schlicht und naheliegend.
+Antworte nur mit JSON in dieser Form:
+{"teile":[{"form":"kugel","pos":[0,0.5,0],"groesse":[1,1,1],"dreh":[0,0,0],"farbe":"#ffffff"}]}`;
+  if (!r.code) return `${base}\n\nAnweisung des Spielers:\n${instruction}`;
+  return `${base}\n\nBisherige Anweisungen des Spielers:\n${history}\n\nDeine bisherige Skulptur:\n${JSON.stringify({ teile: r.code })}\n\nNeue Anweisung des Spielers:\n${instruction}\n\nÄndere deine bisherige Skulptur gemäß der neuen Anweisung. Alles, was die neue Anweisung nicht betrifft, bleibt so, wie es ist. Gib die vollständige neue Teileliste aus.`;
+}
+
+async function sendPrompt() {
+  const r = game.round;
+  const text = $('promptInput').value.trim();
+  if (!text || text.length > MAX_CHARS || r.building || r.prompts.length >= MAX_PROMPTS || !sample) return;
+  $('playErr').hidden = true;
+  const prompt = buildPrompt(r, text);
+  r.building = true;
+  r.ctl = new AbortController();
+  updatePlayUi();
+  try {
+    let code;
+    if (game.kind === 'bild') {
+      const res = await sample(prompt, { modelTier: 'quick', signal: r.ctl.signal });
+      code = cleanSvg(res.text);
+      if (!code) throw { code: 'empty_completion' };
+    } else {
+      const data = await sample.json(prompt, { modelTier: 'quick', signal: r.ctl.signal });
+      code = cleanParts(data);
+      if (!code || !code.length) throw { code: 'invalid_json' };
+    }
+    if (r !== game.round) return;
+    r.prompts.push(text);
+    r.code = code;
+    $('promptInput').value = '';
+  } catch (e) {
+    if (r !== game.round) return;
+    if (e && e.code !== 'cancelled') {
+      $('playErr').textContent = errText(e) + ' Die Anweisung wurde nicht gezählt.';
+      $('playErr').hidden = false;
+      aiBlocked(e);
+    }
+  } finally {
+    if (r === game.round) {
+      r.building = false;
+      r.ctl = null;
+      r.last = performance.now();
+      showResultImage();
+      updatePlayUi();
+      if (r.timeUp || (r.prompts.length >= MAX_PROMPTS && r.code)) {
+        // letzte Anweisung verbraucht: kurz anschauen lassen, dann bewerten
+        if (r.timeUp) finishRound();
+      } else $('promptInput').focus();
+    }
+  }
+}
+
+async function finishRound() {
+  const r = game.round;
+  if (!r || r.finished || r.building) return;
+  r.finished = true;
+  clearInterval(game.timer);
+  cancelAnimationFrame(spinRaf);
+  show('screenJudging');
+  const result = await judge(r);
+  game.results[game.turn] = result;
+  saveBest(result);
+  showRoundResult(result);
+}
+
+/* ------------------------------------------------------------------
+   Bewertung
+   ------------------------------------------------------------------ */
+async function judge(r) {
+  const t = game.template;
+  const unused = MAX_PROMPTS - r.prompts.length;
+  const out = {
+    name: playerName(game.turn), prompts: r.prompts.slice(), used: r.prompts.length,
+    timeLeft: Math.round(r.timeLeft), pixel: 0, ai: null, reason: '', good: [], missing: [],
+    bonus: r.code ? unused * BONUS_PER_PROMPT : 0, targetUrl: '', resultUrl: '', total: 0, note: ''
+  };
+  let targetImg, resultImg;
+  if (game.kind === 'bild') {
+    targetImg = await svgCanvas(t.svg, W, H);
+    out.targetUrl = svgUrl(t.svg);
+    if (r.code) {
+      try { resultImg = await svgCanvas(r.code, W, H); out.resultUrl = svgUrl(r.code); } catch (e) { resultImg = null; }
+    }
+    if (resultImg) out.pixel = pixelScore([targetImg], [resultImg]);
+  } else {
+    targetImg = partsComposite(t.parts, W, H);
+    out.targetUrl = partsToCanvas(t.parts, 25, W, H).toDataURL('image/png');
+    if (r.code) {
+      resultImg = partsComposite(r.code, W, H);
+      out.resultUrl = partsToCanvas(r.code, 25, W, H).toDataURL('image/png');
+      const views = [0, 55];
+      out.pixel = pixelScore(
+        views.map((v) => partsToCanvas(t.parts, v, W, H)),
+        views.map((v) => partsToCanvas(r.code, v, W, H)),
+        views.map((v) => partsToCanvas(EMPTY_PARTS, v, W, H))
+      );
+    }
+  }
+  if (!resultImg) {
+    out.ai = 0;
+    out.reason = 'Es gab keinen Nachbau, den man bewerten könnte.';
+    out.total = 0;
+    return out;
+  }
+  try {
+    const what = game.kind === 'bild' ? 'Bild' : 'Skulptur (jeweils von vorn und schräg)';
+    const rubric = `Du bist der Schiedsrichter im Spiel „Prompt-Duell“. Ein Spieler hat einer KI, die die Vorlage nicht sehen konnte, Anweisungen gegeben. Vergleiche die Vorlage mit dem Nachbau und vergib 0 bis 100 Punkte dafür, wie gut der Nachbau die Vorlage trifft.
+
+Gewichtung: Motiv und Gegenstände 40, Anordnung und Proportionen 30, Farben 20, Details 10.
+Maßstab: 100 nur bei praktisch gleichem Ergebnis. Gleiches Motiv mit kleinen Abweichungen 70 bis 90. Erkennbar, aber deutlich anders 40 bis 65. Kaum Ähnlichkeit 5 bis 30. Ein leeres oder ganz anderes Ergebnis 0 bis 5. Bewerte nur, was zu sehen ist; der Stil der Ausführung zählt nicht.`;
+    const format = `Antworte nur mit JSON: {"punkte": Zahl von 0 bis 100, "begruendung": "ein bis zwei Sätze auf Deutsch, den Spieler mit du ansprechen", "gut": ["höchstens 3 kurze Punkte, was getroffen ist"], "fehlt": ["höchstens 3 kurze Punkte, was fehlt oder abweicht"]}`;
+    let data;
+    if (canSendImages) {
+      const blobs = [await canvasBlob(targetImg), await canvasBlob(resultImg)];
+      data = await sample.json(`${rubric}\n\nBild 1 ist die Vorlage (${what}). Bild 2 ist der Nachbau.\n\n${format}`, { images: blobs });
+    } else {
+      const tCode = game.kind === 'bild' ? t.svg : JSON.stringify({ teile: t.parts });
+      const rCode = game.kind === 'bild' ? r.code : JSON.stringify({ teile: r.code });
+      const fmt = game.kind === 'bild' ? 'SVG-Code' : 'Teileliste (y nach oben, Boden bei 0)';
+      data = await sample.json(`${rubric}\n\nDu siehst beide als ${fmt}. Stell dir vor, wie sie gezeichnet aussehen, und vergleiche das Aussehen, nicht den Code.\n\nVorlage:\n${tCode}\n\nNachbau:\n${rCode}\n\n${format}`);
+    }
+    out.ai = clamp(Math.round(Number(data && data.punkte)), 0, 100);
+    if (!Number.isFinite(out.ai)) throw { code: 'invalid_json' };
+    out.reason = String(data.begruendung || '').slice(0, 400);
+    out.good = Array.isArray(data.gut) ? data.gut.slice(0, 3).map(String) : [];
+    out.missing = Array.isArray(data.fehlt) ? data.fehlt.slice(0, 3).map(String) : [];
+  } catch (e) {
+    aiBlocked(e);
+    out.ai = null;
+    out.note = 'Der Schiedsrichter war nicht erreichbar (' + errText(e) + '). Gewertet wurde nur der Pixel-Vergleich.';
+  }
+  const base = out.ai == null ? out.pixel : Math.round(0.6 * out.ai + 0.4 * out.pixel);
+  out.total = Math.min(100, base + out.bonus);
+  return out;
+}
+
+function saveBest(res) {
+  if (!res.total) return;
+  const all = store.get(BEST_KEY, {});
+  const list = all[game.template.id] || [];
+  list.push({ name: res.name, score: res.total, used: res.used, date: new Date().toISOString().slice(0, 10) });
+  list.sort((a, b) => b.score - a.score || a.used - b.used);
+  all[game.template.id] = list.slice(0, 5);
+  store.set(BEST_KEY, all);
+}
+
+function showRoundResult(res) {
+  const t = game.template;
+  $('resultWho').textContent = (game.mode === 'duell' ? res.name + ' · ' : '') + t.title;
+  $('resultTitle').textContent = res.total >= 85 ? 'Fast wie das Original' : res.total >= 65 ? 'Gut getroffen' : res.total >= 40 ? 'Erkennbar' : res.total > 0 ? 'Da geht noch mehr' : 'Kein Nachbau';
+  const score = $('resultScore');
+  score.innerHTML = '';
+  score.append(String(res.total), el('small', { text: ' / 100' }));
+  const rows = $('resultRows');
+  rows.innerHTML = '';
+  const row = (a, b) => rows.append(el('div', null, el('span', { text: a }), el('span', { text: b })));
+  row('KI-Schiedsrichter', res.ai == null ? 'fehlt' : res.ai + ' × 60 %');
+  row('Pixel-Vergleich', res.pixel + ' × 40 %');
+  row('Bonus für ' + (MAX_PROMPTS - res.used) + ' freie Anweisungen', '+' + res.bonus);
+  row('Anweisungen benutzt', res.used + ' von ' + MAX_PROMPTS);
+  row('Restzeit', fmtTime(res.timeLeft));
+
+  $('cmpTarget').src = res.targetUrl;
+  $('cmpResult').src = res.resultUrl || res.targetUrl;
+  $('cmpResult').style.visibility = res.resultUrl ? 'visible' : 'hidden';
+  $('cmpResultCap').textContent = res.resultUrl ? 'Nachbau nach ' + res.used + (res.used === 1 ? ' Anweisung' : ' Anweisungen') : 'Kein Nachbau';
+
+  const v = $('verdict');
+  v.innerHTML = '';
+  v.append(el('span', { class: 'label', text: 'Urteil' }));
+  if (res.reason) v.append(el('p', { text: res.reason }));
+  if (res.note) v.append(el('p', { class: 'err', text: res.note }));
+  if (res.good.length) v.append(el('ul', { class: 'plus' }, ...res.good.map((g) => el('li', { text: g }))));
+  if (res.missing.length) v.append(el('ul', { class: 'minus' }, ...res.missing.map((g) => el('li', { text: g }))));
+  if (res.prompts.length) {
+    v.append(el('span', { class: 'label', text: 'Deine Anweisungen' }));
+    v.append(el('ol', null, ...res.prompts.map((p) => el('li', { text: p }))));
+  }
+
+  const board = $('board');
+  board.innerHTML = '';
+  const list = store.get(BEST_KEY, {})[t.id] || [];
+  if (list.length) {
+    board.append(el('span', { class: 'label', text: 'Bestenliste dieser Vorlage' }));
+    board.append(el('ol', null, ...list.map((e) => el('li', null, el('span', { text: String(e.score) }), ' ' + e.name + ' · ' + e.used + ' Anw. · ' + e.date))));
+  }
+
+  const acts = $('resultActions');
+  acts.innerHTML = '';
+  if (game.mode === 'duell' && game.turn === 0) {
+    const next = el('button', { type: 'button', class: 'btn btn-primary', text: playerName(1) + ' ist dran' });
+    next.addEventListener('click', () => {
+      $('handoffTitle').textContent = playerName(1) + ', du bist dran';
+      $('handoffText').textContent = 'Gleiche Vorlage, gleiche Regeln. ' + playerName(0) + ' hat ' + res.total + ' Punkte geholt. Die Uhr startet, sobald du auf „Los geht\'s“ tippst.';
+      show('screenHandoff');
+    });
+    acts.append(next);
+  } else if (game.mode === 'duell') {
+    const fin = el('button', { type: 'button', class: 'btn btn-primary', text: 'Zum Duell-Ergebnis' });
+    fin.addEventListener('click', showDuel);
+    acts.append(fin);
+  } else {
+    const again = el('button', { type: 'button', class: 'btn btn-primary', text: 'Noch einmal' });
+    again.addEventListener('click', () => startMatch(t));
+    const menu = el('button', { type: 'button', class: 'btn', text: 'Andere Vorlage' });
+    menu.addEventListener('click', toMenu);
+    acts.append(again, menu);
+  }
+  show('screenResult');
+}
+
+function showDuel() {
+  const [a, b] = game.results;
+  const sides = $('duelSides');
+  sides.innerHTML = '';
+  const winner = a.total === b.total ? (a.used === b.used ? -1 : (a.used < b.used ? 0 : 1)) : (a.total > b.total ? 0 : 1);
+  $('duelTitle').textContent = winner < 0 ? 'Unentschieden' : game.results[winner].name + ' gewinnt' + (a.total === b.total ? ' mit weniger Anweisungen' : '');
+  game.results.forEach((r, i) => {
+    sides.append(el('div', { class: 'duel-side', 'data-win': String(i === winner) },
+      el('span', { class: 'label', text: r.name }),
+      r.resultUrl ? el('img', { src: r.resultUrl, alt: 'Nachbau von ' + r.name }) : el('div', { class: 'thumb' }),
+      el('div', { class: 'score', text: String(r.total) }),
+      el('p', { class: 'rules', text: (r.ai == null ? '' : 'Schiedsrichter ' + r.ai + ' · ') + 'Pixel ' + r.pixel + ' · Bonus +' + r.bonus + ' · ' + r.used + ' Anweisungen' }),
+      r.reason ? el('p', { text: r.reason }) : null
+    ));
+  });
+  show('screenDuel');
+}
+
+function toMenu() {
+  clearInterval(game.timer);
+  cancelAnimationFrame(spinRaf);
+  if (game.round && game.round.ctl) game.round.ctl.abort();
+  game.round = null;
+  renderTemplates();
+  show('screenMenu');
+}
+
+/* ------------------------------------------------------------------
+   Start
+   ------------------------------------------------------------------ */
+function init() {
+  try { $('name1').value = store.get('promptduell.names', ['', ''])[0] || ''; $('name2').value = store.get('promptduell.names', ['', ''])[1] || ''; } catch (e) { /* egal */ }
+  for (const id of ['name1', 'name2']) $(id).addEventListener('change', () => store.set('promptduell.names', [$('name1').value, $('name2').value]));
+  bindSeg('segKind', 'kind', (k) => { game.kind = k; renderTemplates(); });
+  bindSeg('segMode', 'mode', (m) => {
+    game.mode = m;
+    $('name2').hidden = m !== 'duell';
+    $('name1').placeholder = m === 'duell' ? 'Name Spieler 1' : 'Dein Name';
+  });
+  $('promptInput').addEventListener('input', updatePlayUi);
+  $('promptInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendPrompt(); }
+  });
+  $('btnSend').addEventListener('click', sendPrompt);
+  $('btnStop').addEventListener('click', () => { if (game.round && game.round.ctl) game.round.ctl.abort(); });
+  $('btnSubmitRound').addEventListener('click', finishRound);
+  $('btnHandoff').addEventListener('click', () => { game.turn = 1; startRound(); });
+  $('btnDuelAgain').addEventListener('click', () => {
+    const list = templates().filter((t) => t.id !== game.template.id);
+    startMatch(list[Math.floor(Math.random() * list.length)]);
+  });
+  $('btnDuelMenu').addEventListener('click', toMenu);
+  renderRules();
+  renderTemplates();
+  connectAi();
+}
+init();
+</script>
+</body>
+</html>
