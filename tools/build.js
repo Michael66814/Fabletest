@@ -23,7 +23,7 @@ function build(fragment) {
   };
   const title = pick(/<title>[^<]*<\/title>/, 'Titel');
   const viewportSides = pick(/<meta name="claude:viewport-fit-sides"[^>]*>/, 'claude:viewport-fit-sides');
-  const fonts = pick(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>/, 'Schrift-Link');
+  const fonts = pick(/<link rel="preconnect"[^>]*>\s*<link rel="stylesheet"[^>]*href="https:\/\/fonts\.googleapis\.com[^>]*>/, 'Schrift-Link');
   const cssHref = pick(/<link rel="stylesheet" href="css\/[^"]+">/, 'Stylesheet').match(/href="([^"]+)"/)[1];
   const style = '<style>\n' + read(cssHref).trim() + '\n</style>';
 

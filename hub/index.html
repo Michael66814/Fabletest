@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quest-Buch</title>
+<meta name="description" content="Test-Oberfläche für das Hauptspiel: Quests annehmen, Minispiele starten, Fortschritt verfolgen.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&amp;display=swap">
+<link rel="stylesheet" href="hub.css">
+</head>
+<body>
+<main class="hub" id="hub">
+  <header class="hub-head">
+    <div>
+      <p class="eyebrow">Hauptspiel · Testversion</p>
+      <h1>Quest-Buch</h1>
+    </div>
+    <dl class="profile" id="profile" aria-label="Profil"></dl>
+  </header>
+
+  <div class="sections" id="sections"></div>
+
+  <footer class="hub-foot">
+    <button class="btn btn-small" id="btnFree" type="button">Würfelflug frei spielen</button>
+    <button class="btn btn-small" id="btnReset" type="button">Fortschritt löschen</button>
+  </footer>
+</main>
+
+<section class="player" id="player" hidden aria-label="Minispiel">
+  <div class="player-bar">
+    <button class="btn btn-small" id="btnClose" type="button">Zurück zum Quest-Buch</button>
+    <span class="player-title" id="playerTitle"></span>
+  </div>
+  <div class="player-stage" id="playerStage"></div>
+</section>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="../platform/minigame-protocol.js"></script>
+<script src="../platform/quests.js"></script>
+<script src="../js/manifest.js"></script>
+<script src="quests-wuerfelflug.js"></script>
+<script src="hub.js"></script>
+</body>
+</html>

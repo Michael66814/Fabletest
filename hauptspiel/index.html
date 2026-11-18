@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hauptspiel</title>
+<meta name="description" content="Lauf mit deiner Figur über die Insel und starte an den Stationen die Minispiele.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&amp;display=swap">
+<link rel="stylesheet" href="hauptspiel.css">
+</head>
+<body>
+<div class="world" id="world">
+  <canvas id="scene" aria-label="3D-Welt: Insel mit Stationen für die Minispiele"></canvas>
+  <div class="labels" id="labels" aria-hidden="true"></div>
+
+  <div class="hud">
+    <div class="hud-chips">
+      <span class="chip"><b id="hudXp">0</b> EP</span>
+      <button class="chip chip-btn" id="btnQuests" type="button"><b id="hudQuests">0</b> <span id="hudQuestsText">Quests</span></button>
+    </div>
+  </div>
+
+  <div class="help" id="help">
+    <p class="help-keys" id="helpKeys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> laufen · <kbd>Shift</kbd> rennen · Maus ziehen: umsehen · <kbd>E</kbd> auswählen</p>
+    <p class="help-touch" id="helpTouch">Links ziehen: laufen · rechts ziehen: umsehen</p>
+  </div>
+
+  <button class="prompt" id="prompt" type="button" hidden><kbd>E</kbd><span id="promptText"></span></button>
+  <div class="stick" id="stick" hidden><span></span></div>
+  <div class="loading" id="loading">Insel wird gebaut …</div>
+</div>
+
+<section class="player" id="player" hidden aria-label="Minispiel">
+  <div class="player-bar">
+    <button class="btn btn-small" id="btnBack" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Zurück zur Insel
+    </button>
+    <span class="player-title" id="playerTitle"></span>
+  </div>
+  <div class="player-stage" id="playerStage">
+    <div class="loader" id="loader" role="status" hidden>
+      <div class="loader-die" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p class="loader-text"><span id="loaderName">Minispiel</span> wird geladen …</p>
+      <p class="loader-slow" id="loaderSlow" hidden>Das dauert länger als sonst. Bei schwacher Verbindung kann der erste Start etwas brauchen.</p>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="questPanel" role="dialog" aria-modal="true" aria-labelledby="questTitle" hidden>
+  <div class="panel-card" id="questCard" tabindex="-1">
+    <div class="panel-head">
+      <h2 id="questTitle">Quest-Tafel</h2>
+      <button class="btn btn-small" id="btnQuestClose" type="button">Schließen</button>
+    </div>
+    <div id="questList"></div>
+  </div>
+</section>
+
+<!-- Ohne WebGL: einfache Auswahl statt Welt -->
+<section class="fallback" id="fallback" hidden>
+  <h1>Hauptspiel</h1>
+  <p>Dein Browser kann die 3D-Welt nicht anzeigen. Die Minispiele gehen trotzdem:</p>
+  <ul id="fallbackList"></ul>
+</section>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="../platform/minigame-protocol.js"></script>
+<script src="../platform/quests.js"></script>
+<script src="../js/manifest.js"></script>
+<script src="../hub/quests-wuerfelflug.js"></script>
+<script src="spiele.js"></script>
+<script type="module" src="hauptspiel.js"></script>
+</body>
+</html>
