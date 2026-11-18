@@ -1,6 +1,11 @@
 /* Hauptspiel – die 3D-Welt: Insel, Pflanzen, Stationen der Minispiele, Quest-Tafel
    und die Spielfigur. Alles aus einfachen Formen gebaut (keine Modelldateien).
-   Maße in Metern; die Figur ist knapp 2,4 m groß, die Insel hat 30 m Radius. */
+
+   Die Insel wird in "Plan-Einheiten" gebaut (Radius 30, Orte aus spiele.js) und dann
+   als Ganzes um opts.scale vergrößert. Die Figur wird nicht vergrößert: So bestimmt
+   scale, wie groß die Welt im Verhältnis zur Figur wirkt und wie lang die Wege sind.
+   Alles, was buildWorld zurückgibt (Hindernisse, Stationen, Radius), ist schon in
+   echten Einheiten der Welt. */
 import * as THREE from '../vendor/three/three.module.min.js';
 
 const COLORS = {
@@ -48,7 +53,7 @@ function distToSegment(px, pz, ax, az, bx, bz) {
 // ---------- Licht und Himmel ----------
 function addLights(scene, quality) {
   scene.background = new THREE.Color(COLORS.sky);
-  scene.fog = new THREE.Fog(COLORS.sky, 55, 130);
+  scene.fog = new THREE.Fog(COLORS.sky, 90, 230);
   scene.add(new THREE.HemisphereLight('#d8efff', '#4f6b3a', 1.1));
   const sun = new THREE.DirectionalLight('#fff1d6', 2.2);
   sun.position.set(-22, 40, 18);
@@ -60,6 +65,7 @@ function addLights(scene, quality) {
   sun.shadow.normalBias = 0.04;
   scene.add(sun);
   scene.add(sun.target);
+  return sun;
 }
 
 // ---------- Insel ----------
@@ -176,13 +182,13 @@ function scatter(scene, colliders, R, keepClear, rnd) {
     colliders.push({ x: p.x, z: p.z, r: s * 1.05 });
   }
   // Blumen (nur Schmuck, kein Hindernis)
-  const flowerGeo = new THREE.IcosahedronGeometry(0.13, 0);
-  const stemGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 4);
-  for (let i = 0; i < 110; i++) {
+  const flowerGeo = new THREE.IcosahedronGeometry(0.08, 0);
+  const stemGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.2, 4);
+  for (let i = 0; i < 180; i++) {
     const p = spot(3, R - 0.8, 0.1);
     if (!p) continue;
-    scene.add(mesh(stemGeo, mat('#3d7a35'), p.x, 0.17, p.z, { cast: false }));
-    scene.add(mesh(flowerGeo, mat(COLORS.flowers[i % COLORS.flowers.length]), p.x, 0.38, p.z, { cast: false }));
+    scene.add(mesh(stemGeo, mat('#3d7a35'), p.x, 0.1, p.z, { cast: false }));
+    scene.add(mesh(flowerGeo, mat(COLORS.flowers[i % COLORS.flowers.length]), p.x, 0.22, p.z, { cast: false }));
   }
 }
 
@@ -385,22 +391,29 @@ export function makeCharacter() {
 }
 
 // ---------- Alles zusammen ----------
-export function buildWorld(scene, opts) {
+export function buildWorld(world3d, opts) {
   const R = opts.welt.radius;
+  const S = opts.scale || 1;
   const quality = opts.quality;
   const rnd = random(20261118);
   const colliders = [];
   const stations = [];
   const updaters = [];
 
-  addLights(scene, quality);
+  // Licht hängt an der echten Szene, alles andere an einer vergrößerten Gruppe
+  const sun = addLights(world3d, quality);
+  const sunOffset = sun.position.clone();
+  const scene = new THREE.Group();
+  scene.scale.setScalar(S);
+  world3d.add(scene);
+
   addIsland(scene, R);
   updaters.push(addPlaza(scene, colliders));
 
   const keepClear = [{ x: 0, z: 0, r: 6.5 }];
   function withPath(x, z) {
-    addPath(scene, 0, 0, x, z, 2.6);
-    keepClear.push({ seg: [0, 0, x, z], r: 1.8 });
+    addPath(scene, 0, 0, x, z, 1.7);
+    keepClear.push({ seg: [0, 0, x, z], r: 1.4 });
   }
 
   for (const spiel of opts.spiele) {
@@ -408,6 +421,10 @@ export function buildWorld(scene, opts) {
     const built = spiel.station === 'wuerfel' ? stationWuerfel(spiel) : stationBaustelle(spiel);
     built.group.position.set(o.x, 0, o.z);
     face(built.group, 0, 0);
+    // Lampen reichen in echten Einheiten: Reichweite und Stärke mitvergrößern
+    built.group.traverse(obj => {
+      if (obj.isPointLight) { obj.distance *= S; obj.intensity *= S * S; }
+    });
     scene.add(built.group);
     withPath(o.x * 0.78, o.z * 0.78);
     keepClear.push({ x: o.x, z: o.z, r: 5 });
@@ -435,10 +452,17 @@ export function buildWorld(scene, opts) {
   updaters.push(addClouds(scene, rnd));
 
   return {
-    colliders,
-    stations,
-    radius: R,
+    scale: S,
+    colliders: colliders.map(c => ({ x: c.x * S, z: c.z * S, r: c.r * S })),
+    stations: stations.map(st => Object.assign({}, st, { x: st.x * S, z: st.z * S, reach: st.reach * S, labelY: st.labelY * S })),
+    radius: R * S,
+    start: { x: opts.welt.start.x * S, z: opts.welt.start.z * S },
     setQuestMark(visible) { board.mark.visible = visible; },
+    // Schatten nur rund um die Figur berechnen: bleibt auch auf großer Insel scharf
+    followShadow(x, z) {
+      sun.target.position.set(x, 0, z);
+      sun.position.set(x + sunOffset.x, sunOffset.y, z + sunOffset.z);
+    },
     update(t) { for (const u of updaters) u(t); }
   };
 }

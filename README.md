@@ -107,7 +107,7 @@ Allein geöffnet verhält sich Würfelflug wie vorher.
 | `js/demos.js` | Lösungen und Schwierigkeitswertung des Bots (wird erzeugt, nicht von Hand ändern) |
 | `js/manifest.js`, `js/embed.js` | Beschreibung fürs Hauptspiel und Anbindung im `<iframe>` |
 | `platform/` | Minispiel-Protokoll und Quest-Buch (für alle Minispiele gleich) |
-| `hauptspiel/` | Hauptspiel als 3D-Welt: `welt.js` (Insel, Figur, Stationen), `steuerung.js` (Tastatur, Maus, Touch), `hauptspiel.js` (Ablauf), `spiele.js` (Minispiele und ihre Orte) |
+| `hauptspiel/` | Hauptspiel als 3D-Welt: `welt.js` (Insel, Figur, Stationen; Größe der Welt über WORLD_SCALE in hauptspiel.js), `steuerung.js` (Tastatur, Maus, Touch), `hauptspiel.js` (Ablauf), `spiele.js` (Minispiele und ihre Orte) |
 | `vendor/three/` | three.js 0.170 (MIT) für die 3D-Welt, unverändert eingebunden |
 | `hub/` | Quest-Buch mit Beispiel-Quests |
 | `docs/` | Schnittstelle und Quest-Format |

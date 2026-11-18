@@ -13,7 +13,8 @@ export function createInput(canvas, stick) {
     look: { yaw: 0, pitch: 0 },  // gesammelte Kamera-Drehung seit dem letzten Abholen
     zoom: 0,
     interact: false,             // einmaliger Druck, wird beim Abholen zurückgesetzt
-    touch: false,                // zuletzt per Touch bedient (für die Hilfe-Texte)
+    // zuletzt per Touch bedient (für die Hilfe-Texte); Touch-Geräte starten gleich so
+    touch: !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
     used: false                  // überhaupt schon bewegt
   };
   let joy = null;                // { id, x0, y0, x, y }

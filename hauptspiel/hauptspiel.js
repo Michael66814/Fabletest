@@ -7,7 +7,12 @@ import { buildWorld, makeCharacter } from './welt.js';
 import { createInput } from './steuerung.js';
 
 const QUEST_KEY = 'questbuch.v1';
-const WORLD_KEY = 'welt.v1';
+const WORLD_KEY = 'welt.v2';           // v2: größere Insel, alte Positionen passen nicht mehr
+
+// Größenverhältnis Welt zu Figur und Tempo der Figur (Einheiten pro Sekunde)
+const WORLD_SCALE = 1.8;
+const WALK_SPEED = 4.5;
+const RUN_SPEED = 8.5;
 const manifests = globalThis.MINIGAMES || {};
 const SPIELE = globalThis.SPIELE || [];
 const WELT = globalThis.WELT;
@@ -282,7 +287,7 @@ function start() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
-  world = buildWorld(scene, { spiele: SPIELE, welt: WELT, quality: { shadowSize: small ? 1024 : 2048 } });
+  world = buildWorld(scene, { spiele: SPIELE, welt: WELT, scale: WORLD_SCALE, quality: { shadowSize: small ? 1024 : 2048 } });
   const hero = makeCharacter();
   scene.add(hero.group);
 
@@ -290,8 +295,8 @@ function start() {
   canvas.tabIndex = -1;
 
   // Spielerposition und Kamera
-  const me = { x: WELT.start.x, z: WELT.start.z, angle: Math.PI, speed: 0 };
-  const cam = { yaw: 0, pitch: 0.42, dist: 12 };
+  const me = { x: world.start.x, z: world.start.z, angle: Math.PI, speed: 0 };
+  const cam = { yaw: 0, pitch: 0.38, dist: 13 };
   try {
     const saved = JSON.parse(window.localStorage.getItem(WORLD_KEY) || 'null');
     if (saved && isFinite(saved.x) && isFinite(saved.z) && Math.hypot(saved.x, saved.z) < world.radius) {
@@ -353,7 +358,7 @@ function start() {
     // Kamera drehen und zoomen
     cam.yaw += inp.look.yaw;
     cam.pitch = Math.max(0.12, Math.min(1.15, cam.pitch + inp.look.pitch));
-    cam.dist = Math.max(6, Math.min(22, cam.dist + inp.zoom * 1.2));
+    cam.dist = Math.max(6, Math.min(30, cam.dist + inp.zoom * 1.5));
 
     // Laufen relativ zur Blickrichtung der Kamera
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw);
@@ -361,7 +366,7 @@ function start() {
     let mx = fx * inp.move.y + rx * inp.move.x;
     let mz = fz * inp.move.y + rz * inp.move.x;
     const amount = Math.min(1, Math.hypot(mx, mz));
-    const target = amount * (inp.run ? 10 : 6);
+    const target = amount * (inp.run ? RUN_SPEED : WALK_SPEED);
     me.speed += (target - me.speed) * Math.min(1, dt * 10);
     if (amount > 0.01) {
       const len = Math.hypot(mx, mz);
@@ -391,7 +396,8 @@ function start() {
 
     hero.group.position.set(me.x, 0, me.z);
     hero.group.rotation.y = me.angle;
-    hero.update(dt, Math.min(1, me.speed / 10), t);
+    hero.update(dt, Math.min(1, me.speed / RUN_SPEED), t);
+    world.followShadow(me.x, me.z);
 
     // Kamera folgt weich
     const cp = Math.cos(cam.pitch);
@@ -407,7 +413,7 @@ function start() {
     }
     // Minispiel in der Nähe schon vorladen
     for (const st of world.stations) {
-      if (st.kind === 'spiel' && Math.hypot(me.x - st.x, me.z - st.z) < st.reach + 9) preloadGame(st.id);
+      if (st.kind === 'spiel' && Math.hypot(me.x - st.x, me.z - st.z) < st.reach + 16) preloadGame(st.id);
     }
     if (best !== near) {
       near = best;
@@ -432,7 +438,7 @@ function start() {
     labels.forEach(l => { l.d = Math.hypot(me.x - l.st.x, me.z - l.st.z); });
     labels.slice().sort((a, b) => a.d - b.d).forEach(l => {
       tmp.copy(l.v).project(camera);
-      let ok = l.d < 32 && tmp.z < 1 && Math.abs(tmp.x) < 1.1 && Math.abs(tmp.y) < 1.1;
+      let ok = l.d < 55 && tmp.z < 1 && Math.abs(tmp.x) < 1.1 && Math.abs(tmp.y) < 1.1;
       const x = (tmp.x + 1) / 2 * w, y = (1 - tmp.y) / 2 * h;
       const bw = l.w || (l.w = l.node.offsetWidth || 160), bh = 34;
       if (ok) {
@@ -442,7 +448,7 @@ function start() {
       }
       if (!ok) { l.node.style.opacity = '0'; return; }
       shown.push({ x, y, bw });
-      l.node.style.opacity = String(Math.max(0, Math.min(1, (32 - l.d) / 6)));
+      l.node.style.opacity = String(Math.max(0, Math.min(1, (55 - l.d) / 8)));
       l.node.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%, -100%)';
     });
   }
@@ -471,6 +477,7 @@ function start() {
     preloaded: () => preloaded ? { id: preloaded.id, ready: preloaded.game.ready(), state: preloaded.game.state() } : null,
     state: () => ({ x: me.x, z: me.z, angle: me.angle, near: near && near.id, paused, quests: !$('questPanel').hidden, camYaw: cam.yaw }),
     stations: () => world.stations.map(s => ({ id: s.id, kind: s.kind, x: s.x, z: s.z, reach: s.reach })),
+    radius: () => world.radius,
     teleport: (x, z) => { me.x = x; me.z = z; }
   };
 }

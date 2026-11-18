@@ -96,10 +96,11 @@ async function main() {
   await until(() => { const d = globalThis.HAUPTSPIEL.state(); return Math.hypot(d.x, d.z) >= 2.9; }, null, 3000);
   s = await st();
   check('Brunnen ist ein Hindernis', Math.hypot(s.x, s.z) >= 2.9, 'Abstand ' + Math.hypot(s.x, s.z).toFixed(2));
-  await teleport(0, 45);
-  await until(() => { const d = globalThis.HAUPTSPIEL.state(); return Math.hypot(d.x, d.z) <= 29.01; }, null, 3000);
+  const radius = await page.evaluate(() => globalThis.HAUPTSPIEL.radius());
+  await teleport(0, radius + 40);
+  await until(r => { const d = globalThis.HAUPTSPIEL.state(); return Math.hypot(d.x, d.z) <= r; }, radius, 3000);
   s = await st();
-  check('Figur bleibt auf der Insel', Math.hypot(s.x, s.z) <= 29.01, 'Abstand ' + Math.hypot(s.x, s.z).toFixed(2));
+  check('Figur bleibt auf der Insel', Math.hypot(s.x, s.z) <= radius - 0.99, 'Abstand ' + Math.hypot(s.x, s.z).toFixed(2) + ' von ' + radius.toFixed(0));
 
   // ---- Würfelflug-Station ----
   const wf = stations.find(x => x.id === 'wuerfelflug');
