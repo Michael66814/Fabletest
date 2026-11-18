@@ -14,9 +14,11 @@
   var pending = null;      // Startangaben, die vor dem Spiel eintrafen
   var fixed = false;       // Hauptspiel hat ein bestimmtes Level gestartet
   var run = null;          // Zusammenfassung der Sitzung
+  var started = false;     // Hauptspiel hat mindestens einmal gestartet
 
   var host = Minigame.connectHost(manifest, {
     start: function (params) {
+      started = true;
       pending = params;
       if (control) apply();
     },
@@ -72,6 +74,8 @@
       host.emit(name, data);
     },
     fixedLevel: function () { return fixed; },
+    // vorgeladen, aber noch nicht gestartet: nichts zeichnen, Rechenzeit sparen
+    waiting: function () { return !started; },
     // Spieler verlässt das Level über "Zurück": Sitzung beenden
     left: function () {
       if (!fixed) return;

@@ -212,6 +212,56 @@ kbd {
 .player-title { font-weight: 500; color: var(--ivory-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-stage { position: relative; flex: 1; min-height: 0; }
 .minigame-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.world.is-behind { visibility: hidden; }
+
+/* Ladebildschirm über dem Minispiel, bis es sich gemeldet hat */
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+  background: radial-gradient(ellipse 70% 60% at 50% 45%, var(--felt-800), var(--felt-950));
+  text-align: center;
+  animation: loader-in 0.25s 0.15s both;      /* kurz verzögert: kein Aufblitzen, wenn es schnell geht */
+}
+@keyframes loader-in { from { opacity: 0; } }
+.loader-die {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: var(--ivory);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: loader-roll 1.4s cubic-bezier(.5, 0, .3, 1) infinite;
+}
+.loader-die i {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--felt-950);
+}
+.loader-die i:nth-child(1) { left: 28%; top: 28%; }
+.loader-die i:nth-child(2) { left: 50%; top: 50%; }
+.loader-die i:nth-child(3) { left: 72%; top: 72%; }
+@keyframes loader-roll {
+  0% { transform: translateY(0) rotate(0deg); }
+  35% { transform: translateY(-26px) rotate(90deg); }
+  60% { transform: translateY(0) rotate(180deg); }
+  70% { transform: translateY(0) scale(1.06, 0.92) rotate(180deg); }
+  100% { transform: translateY(0) rotate(180deg); }
+}
+.loader-text { margin: 0; font-weight: 700; font-size: 1.1rem; }
+.loader-slow { margin: 0; max-width: 34ch; color: var(--ivory-dim); font-size: 0.92rem; }
+@media (prefers-reduced-motion: reduce) {
+  .loader-die { animation: none; }
+}
 
 /* ---------- Quest-Tafel ---------- */
 .panel {

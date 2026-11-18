@@ -38,7 +38,13 @@
     </button>
     <span class="player-title" id="playerTitle"></span>
   </div>
-  <div class="player-stage" id="playerStage"></div>
+  <div class="player-stage" id="playerStage">
+    <div class="loader" id="loader" role="status" hidden>
+      <div class="loader-die" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p class="loader-text"><span id="loaderName">Minispiel</span> wird geladen …</p>
+      <p class="loader-slow" id="loaderSlow" hidden>Das dauert länger als sonst. Bei schwacher Verbindung kann der erste Start etwas brauchen.</p>
+    </div>
+  </div>
 </section>
 
 <section class="panel" id="questPanel" role="dialog" aria-modal="true" aria-labelledby="questTitle" hidden>

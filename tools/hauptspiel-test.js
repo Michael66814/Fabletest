@@ -107,7 +107,15 @@ async function main() {
   check('an der Station erscheint „Würfelflug spielen“',
     await until(() => globalThis.HAUPTSPIEL.state().near === 'wuerfelflug', null, 3000) &&
     await page.isVisible('#prompt') && /Würfelflug spielen/.test(await page.textContent('#prompt')));
+  check('in der Nähe der Station wird Würfelflug vorgeladen',
+    await until(() => { const p = globalThis.HAUPTSPIEL.preloaded(); return p && p.id === 'wuerfelflug' && p.ready; }, null, 15000));
+  const t0 = Date.now();
   await page.keyboard.press('KeyE');
+  const quick = await until(() => (globalThis.HAUPTSPIEL.playing() || {}).state === 'running', null, 10000);
+  check('vorgeladen: Würfelflug ist sofort da', quick && Date.now() - t0 < 1500, (Date.now() - t0) + ' ms');
+  check('Ladebildschirm ist danach weg, die 3D-Welt ausgeblendet',
+    await until(() => document.getElementById('loader').hidden, null, 3000) &&
+    await page.evaluate(() => getComputedStyle(document.getElementById('world')).visibility === 'hidden'));
   let frame = await gameFrame();
   check('E startet Würfelflug im Vollbild, die Welt ruht',
     await page.isVisible('#player') && (await st()).paused &&
@@ -119,7 +127,9 @@ async function main() {
   check('Meldung „Quest geschafft“', await page.isVisible('.toast >> text=Quest geschafft'));
   await page.click('#btnBack');
   check('„Zurück zur Insel“ schließt das Minispiel, die Welt läuft weiter',
-    await until(() => !globalThis.HAUPTSPIEL.playing() && !document.querySelector('iframe') && !globalThis.HAUPTSPIEL.state().paused, null, 5000));
+    await until(() => !globalThis.HAUPTSPIEL.playing() && document.getElementById('player').hidden && !globalThis.HAUPTSPIEL.state().paused, null, 5000));
+  check('an der Station wird für „Nochmal“ gleich wieder vorgeladen',
+    await until(() => { const p = globalThis.HAUPTSPIEL.preloaded(); return p && p.ready; }, null, 15000));
   check('Erfahrung in der Anzeige', (await page.textContent('#hudXp')).trim() === '50');
   check('Anzeige meldet neue Quests', /neu/.test(await page.textContent('#btnQuests')));
 
@@ -141,12 +151,13 @@ async function main() {
   check('Quest annehmen', await until(() => globalThis.HAUPTSPIEL.log().status('wf.glanzkugeln') === 'active', null, 2000) &&
     await page.isVisible('[data-quest="wf.glanzkugeln"] [data-play]'));
   await page.click('[data-quest="wf.glanzkugeln"] [data-play]');
+  check('nicht vorgeladen: Ladebildschirm erscheint', await page.isVisible('#loader') || await page.evaluate(() => (globalThis.HAUPTSPIEL.playing() || {}).state === 'running'));
   frame = await gameFrame();
   check('„Spielen“ auf der Tafel startet das passende Level',
     await frame.waitForFunction(() => { const d = globalThis.WF.debug.state(); return d.screen === 'play' && d.level === 'l4'; }, null, { timeout: 10000 }).then(() => true, () => false) &&
     await page.isHidden('#questPanel'));
   await page.click('#btnBack');
-  await until(() => !document.querySelector('iframe'), null, 5000);
+  await until(() => !globalThis.HAUPTSPIEL.playing(), null, 5000);
   await page.keyboard.press('Escape');
 
   // ---- Baustelle ----

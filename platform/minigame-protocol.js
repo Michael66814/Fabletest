@@ -104,6 +104,7 @@
   // ---------- Seite des Hauptspiels ----------
   // opts: container, url, params, title,
   //       onHello(manifest), onStarted(), onEvent(name, data), onEnded(outcome, summary)
+  //       autoStart: false = nur vorladen; die Sitzung beginnt erst mit begin(params)
   function openMinigame(opts) {
     var doc = root.document;
     var frame = doc.createElement('iframe');
@@ -112,6 +113,8 @@
     var session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     var state = 'loading';                            // loading | running | ended
     var manifest = null;
+    var hello = false;
+    var wantStart = opts.autoStart !== false;
 
     frame.src = opts.url;
     frame.title = opts.title || 'Minispiel';
@@ -135,8 +138,9 @@
           finish('failed', { error: 'Protokollversion ' + manifest.protocol + ' wird nicht unterstützt' });
           return;
         }
+        hello = true;
         cb('onHello', manifest);
-        send('start', { session: session, params: opts.params || {} });
+        if (wantStart) send('start', { session: session, params: opts.params || {} });
       } else if (d.session !== session) {
         return;
       } else if (d.type === 'started') {
@@ -163,6 +167,14 @@
       frame: frame,
       manifest: function () { return manifest; },
       state: function () { return state; },
+      ready: function () { return hello; },
+      // vorgeladenes Minispiel starten (bei autoStart: false)
+      begin: function (params) {
+        if (wantStart || state === 'ended') return;
+        wantStart = true;
+        if (params) opts.params = params;
+        if (hello) send('start', { session: session, params: opts.params || {} });
+      },
       pause: function () { send('pause', { session: session }); },
       resume: function () { send('resume', { session: session }); },
       settings: function (s) { send('settings', { session: session, settings: s }); },

@@ -40,8 +40,75 @@ function toast(html) {
 }
 
 // ---------- Minispiel im Vollbild ----------
-let current = null;
+// Nähert sich die Figur einer Station, lädt das Minispiel schon unsichtbar vor
+// (Protokoll: autoStart false). Beim Auswählen ist es dann meist sofort da.
+let current = null;      // sichtbare Sitzung: { id, game }
+let preloaded = null;    // vorgeladen, noch nicht gestartet
 let onClosed = null;
+let slowTimer = 0;
+
+function handleEvent(spiel, name, data, session) {
+  log = loadLog();
+  const res = log.handle({ game: spiel.id, name, data, session });
+  if (!res.progressed.length && !res.completed.length) return;
+  saveLog(log);
+  res.progressed.forEach(p => {
+    if (p.target > 1 && p.value < p.target) toast(esc(questTitle(p.quest)) + ': ' + p.value + ' / ' + p.target);
+  });
+  res.completed.forEach(c => {
+    const xp = c.rewards.find(r => r.type === 'xp');
+    toast('<b>Quest geschafft:</b> ' + esc(questTitle(c.quest)) + (xp ? ' · ' + xp.amount + ' EP' : ''));
+  });
+  res.started.forEach(q => toast('Neue Quest: ' + esc(questTitle(q))));
+}
+
+function openFrame(spiel, autoStart, params) {
+  const box = { id: spiel.id, game: null };
+  box.game = Minigame.openMinigame({
+    container: $('playerStage'),
+    url: spiel.url,
+    params: params || {},
+    title: nameOf(spiel),
+    autoStart,
+    onStarted: () => {
+      if (current !== box) return;
+      hideLoader();
+      box.game.frame.focus();
+    },
+    onEvent: (name, data) => { if (current === box) handleEvent(spiel, name, data, box.game.session); },
+    onEnded: () => {
+      if (current === box) closeGame();
+      else if (preloaded === box) dropPreload();
+    }
+  });
+  return box;
+}
+
+function preloadGame(id) {
+  if (current || (preloaded && preloaded.id === id)) return;
+  const spiel = SPIELE.find(s => s.id === id);
+  if (!spiel || !spiel.url) return;
+  dropPreload();
+  preloaded = openFrame(spiel, false);
+}
+function dropPreload() {
+  if (!preloaded) return;
+  const p = preloaded;
+  preloaded = null;
+  p.game.destroy();
+}
+
+function showLoader(spiel) {
+  $('loaderName').textContent = nameOf(spiel);
+  $('loaderSlow').hidden = true;
+  $('loader').hidden = false;
+  window.clearTimeout(slowTimer);
+  slowTimer = window.setTimeout(() => { $('loaderSlow').hidden = false; }, 12000);
+}
+function hideLoader() {
+  window.clearTimeout(slowTimer);
+  $('loader').hidden = true;
+}
 
 function playGame(id, params, label) {
   const spiel = SPIELE.find(s => s.id === id);
@@ -49,42 +116,32 @@ function playGame(id, params, label) {
   closeQuests();
   $('player').hidden = false;
   $('playerTitle').textContent = label || nameOf(spiel);
+  $('world').classList.add('is-behind');            // 3D-Welt nicht mehr zeichnen lassen
   pauseWorld(true);
-  current = Minigame.openMinigame({
-    container: $('playerStage'),
-    url: spiel.url,
-    params: params || {},
-    title: nameOf(spiel),
-    onStarted: () => { if (current) current.frame.focus(); },
-    onEvent: (name, data) => {
-      log = loadLog();
-      const res = log.handle({ game: spiel.id, name, data, session: current && current.session });
-      if (!res.progressed.length && !res.completed.length) return;
-      saveLog(log);
-      res.progressed.forEach(p => {
-        if (p.target > 1 && p.value < p.target) toast(esc(questTitle(p.quest)) + ': ' + p.value + ' / ' + p.target);
-      });
-      res.completed.forEach(c => {
-        const xp = c.rewards.find(r => r.type === 'xp');
-        toast('<b>Quest geschafft:</b> ' + esc(questTitle(c.quest)) + (xp ? ' · ' + xp.amount + ' EP' : ''));
-      });
-      res.started.forEach(q => toast('Neue Quest: ' + esc(questTitle(q))));
-    },
-    onEnded: closeGame
-  });
+  showLoader(spiel);
+  if (preloaded && preloaded.id === id && preloaded.game.state() !== 'ended') {
+    current = preloaded;
+    preloaded = null;
+    current.game.begin(params || {});
+  } else {
+    dropPreload();
+    current = openFrame(spiel, true, params);
+  }
 }
 function closeGame() {
   if (!current) return;
   const c = current;
   current = null;
-  c.destroy();
+  c.game.destroy();
+  hideLoader();
   $('player').hidden = true;
+  $('world').classList.remove('is-behind');
   log = loadLog();
   updateHud();
   pauseWorld(false);
   if (onClosed) onClosed();
 }
-$('btnBack').addEventListener('click', () => { if (current) current.stop(); });
+$('btnBack').addEventListener('click', () => { if (current) current.game.stop(); });
 
 // ---------- Quest-Tafel ----------
 function rewardText(rewards) {
@@ -348,6 +405,10 @@ function start() {
       const d = Math.hypot(me.x - st.x, me.z - st.z);
       if (d < st.reach && d < bestD) { best = st; bestD = d; }
     }
+    // Minispiel in der Nähe schon vorladen
+    for (const st of world.stations) {
+      if (st.kind === 'spiel' && Math.hypot(me.x - st.x, me.z - st.z) < st.reach + 9) preloadGame(st.id);
+    }
     if (best !== near) {
       near = best;
       $('prompt').hidden = !near;
@@ -406,7 +467,8 @@ function start() {
   // Für automatische Tests (tools/hauptspiel-test.js)
   globalThis.HAUPTSPIEL = {
     log: () => log,
-    playing: () => current ? { session: current.session, state: current.state() } : null,
+    playing: () => current ? { session: current.game.session, state: current.game.state() } : null,
+    preloaded: () => preloaded ? { id: preloaded.id, ready: preloaded.game.ready(), state: preloaded.game.state() } : null,
     state: () => ({ x: me.x, z: me.z, angle: me.angle, near: near && near.id, paused, quests: !$('questPanel').hidden, camYaw: cam.yaw }),
     stations: () => world.stations.map(s => ({ id: s.id, kind: s.kind, x: s.x, z: s.z, reach: s.reach })),
     teleport: (x, z) => { me.x = x; me.z = z; }

@@ -569,6 +569,7 @@
 
     function frame(t) {
       window.requestAnimationFrame(frame);
+      if (bridge && bridge.waiting()) { lastT = t; return; }   // im Hauptspiel vorgeladen
       var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
       lastT = t;
       renderer.resize();
