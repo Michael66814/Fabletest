@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kurvenfieber</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="3D-Autorennen gegen fünf Computergegner auf drei Strecken: Sonnenküste, Bergpass und Nachtstadt.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='7' fill='%2311151c'/%3E%3Cpath d='M7 20l3-6h12l3 6v3H7z' fill='%23ffb02e'/%3E%3Ccircle cx='11' cy='23' r='2.6' fill='%23f4ecd8'/%3E%3Ccircle cx='21' cy='23' r='2.6' fill='%23f4ecd8'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="game" id="game" data-screen="menu">
+  <canvas id="stage" tabindex="-1" aria-label="Rennstrecke"></canvas>
+  <p class="nogl" id="noGl" hidden>Dein Browser kann kein WebGL darstellen. Ohne WebGL läuft das 3D-Rennen leider nicht.</p>
+
+  <!-- Anzeige während des Rennens -->
+  <div class="hud" id="hud" hidden>
+    <div class="hud-top">
+      <div class="hud-block hud-place">
+        <span class="hud-label">Platz</span>
+        <span class="hud-big"><span id="hudPlace">6</span><small>/<span id="hudCount">6</span></small></span>
+      </div>
+      <div class="hud-block">
+        <span class="hud-label">Runde</span>
+        <span class="hud-mid"><span id="hudLap">1</span><small>/<span id="hudLaps">3</span></small></span>
+      </div>
+      <div class="hud-block hud-times">
+        <span class="hud-label">Zeit</span>
+        <span class="hud-mono" id="hudTime">0:00,0</span>
+        <span class="hud-sub">Beste <span id="hudBest">–</span></span>
+      </div>
+      <div class="hud-buttons">
+        <button class="hud-btn" id="btnCam" type="button" aria-label="Kamera wechseln" title="Kamera (C)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="13" height="10" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 11l5-3v8l-5-3z" fill="currentColor"/></svg>
+        </button>
+        <button class="hud-btn" id="btnSound" type="button" aria-label="Ton stummschalten" aria-pressed="false" title="Ton (M)">
+          <svg class="icon icon-sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4z" fill="currentColor"/><path d="M15 9.3a4 4 0 0 1 0 5.4M17.6 6.8a7.6 7.6 0 0 1 0 10.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <svg class="icon icon-sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4z" fill="currentColor"/><path d="M15.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="hud-btn" id="btnPause" type="button" aria-label="Pause" title="Pause (P)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5.5" width="4" height="13" rx="1.2" fill="currentColor"/><rect x="13.5" y="5.5" width="4" height="13" rx="1.2" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <ol class="standings" id="standings" aria-label="Reihenfolge"></ol>
+    <canvas class="minimap" id="minimap" width="180" height="180" aria-hidden="true"></canvas>
+
+    <div class="center-msg" id="centerMsg" aria-live="assertive"></div>
+    <div class="banner" id="banner" role="status" aria-live="polite"></div>
+    <div class="warn" id="warn" hidden>Falsche Richtung</div>
+
+    <div class="dash" id="dash">
+      <div class="speed"><span id="hudSpeed">0</span><small>km/h</small></div>
+      <div class="turbo" aria-label="Turbo">
+        <span class="turbo-label">Turbo</span>
+        <div class="turbo-track"><div class="turbo-fill" id="turboFill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasten für Touch-Geräte -->
+  <div class="touch" id="touch" hidden>
+    <div class="touch-group">
+      <button class="tbtn" data-key="left" type="button" aria-label="Links"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="tbtn" data-key="right" type="button" aria-label="Rechts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="touch-group">
+      <button class="tbtn tbtn-small" data-key="turbo" type="button" aria-label="Turbo">Turbo</button>
+      <button class="tbtn tbtn-brake" data-key="brake" type="button" aria-label="Bremse">Bremse</button>
+      <button class="tbtn tbtn-gas" data-key="gas" type="button" aria-label="Gas">Gas</button>
+    </div>
+  </div>
+
+  <!-- Hauptmenü -->
+  <section class="menu" id="menu" aria-labelledby="title">
+    <div class="menu-panel">
+      <header class="menu-head">
+        <h1 class="title" id="title">Kurven<span>fieber</span></h1>
+        <p class="lede">Ein 3D-Rennen gegen fünf Computergegner. Wähle eine Strecke, fahr die Ideallinie und spar dir den Turbo für die Geraden auf.</p>
+      </header>
+
+      <div class="menu-body">
+        <fieldset class="pick">
+          <legend>Strecke</legend>
+          <div class="tracks" id="tracks"></div>
+        </fieldset>
+
+        <fieldset class="pick">
+          <legend>Gegner</legend>
+          <div class="seg" id="diffs"></div>
+        </fieldset>
+
+        <fieldset class="pick">
+          <legend>Runden</legend>
+          <div class="seg" id="lapsSeg"></div>
+        </fieldset>
+
+        <button class="btn btn-primary btn-go" id="btnStart" type="button">Rennen starten</button>
+
+        <div class="menu-row">
+          <button class="btn btn-small" id="btnHelp" type="button">Steuerung</button>
+          <a class="btn btn-small btn-link" href="../index.html">← Würfelflug</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dialog" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+    <div class="dialog-card" tabindex="-1">
+      <h2 id="helpTitle">Steuerung</h2>
+      <table class="keys-table">
+        <tbody>
+          <tr><th scope="row">Gas</th><td><kbd>↑</kbd> oder <kbd>W</kbd></td></tr>
+          <tr><th scope="row">Bremsen, rückwärts</th><td><kbd>↓</kbd> oder <kbd>S</kbd></td></tr>
+          <tr><th scope="row">Lenken</th><td><kbd>←</kbd> <kbd>→</kbd> oder <kbd>A</kbd> <kbd>D</kbd></td></tr>
+          <tr><th scope="row">Turbo</th><td><kbd>Leertaste</kbd> oder <kbd>Shift</kbd></td></tr>
+          <tr><th scope="row">Kamera</th><td><kbd>C</kbd></td></tr>
+          <tr><th scope="row">Pause, Ton, Neustart</th><td><kbd>P</kbd> <kbd>M</kbd> <kbd>R</kbd></td></tr>
+        </tbody>
+      </table>
+      <ul class="howto">
+        <li>Der <b>Turbo</b> füllt sich langsam von selbst wieder auf. Er bringt mehr Schub und ein höheres Spitzentempo.</li>
+        <li>Neben der Fahrbahn bremst das Gras. Wer gegen die <b>Leitplanke</b> fährt, verliert viel Tempo.</li>
+        <li>Zu schnell in der Kurve? Das Auto <b>rutscht</b> nach außen und radiert Tempo weg. Vorher bremsen ist schneller.</li>
+        <li>Mit Gamepad: linker Stick lenkt, rechter Trigger Gas, linker Trigger Bremse, A-Taste Turbo.</li>
+        <li>Auf dem Handy: Tasten unten links lenken, unten rechts Gas, Bremse und Turbo.</li>
+      </ul>
+      <div class="dialog-actions">
+        <button class="btn btn-primary" id="btnHelpClose" type="button">Schließen</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="dialog" id="pause" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+    <div class="dialog-card" tabindex="-1">
+      <p class="eyebrow" id="pauseTrack">Strecke</p>
+      <h2 id="pauseTitle">Pause</h2>
+      <div class="dialog-actions">
+        <button class="btn btn-primary" id="btnResume" type="button">Weiter</button>
+        <button class="btn" id="btnRestart" type="button">Neu starten</button>
+        <button class="btn" id="btnQuit" type="button">Zum Menü</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="dialog" id="result" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
+    <div class="dialog-card dialog-wide" tabindex="-1">
+      <p class="eyebrow" id="resultTrack">Strecke</p>
+      <h2 id="resultTitle">Platz 1</h2>
+      <p class="result-note" id="resultNote"></p>
+      <div class="table-wrap">
+        <table class="result-table">
+          <thead><tr><th scope="col">Platz</th><th scope="col">Fahrer</th><th scope="col">Zeit</th><th scope="col">Beste Runde</th></tr></thead>
+          <tbody id="resultRows"></tbody>
+        </table>
+      </div>
+      <div class="dialog-actions dialog-actions-row">
+        <button class="btn btn-primary" id="btnAgain" type="button">Nochmal</button>
+        <button class="btn" id="btnNextTrack" type="button">Nächste Strecke</button>
+        <button class="btn" id="btnMenu" type="button">Zum Menü</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/tracks.js"></script>
+<script src="js/track.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render3d.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

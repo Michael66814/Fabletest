@@ -7,6 +7,9 @@ Trickwürfel), Pfeil-Tore ändern das Tempo, und Augments helfen ein Stück weit
 
 Kein Build-Schritt, keine Abhängigkeiten – reines HTML, CSS und JavaScript.
 
+Zweites Minigame im Ordner `rennen/`: **Kurvenfieber**, ein 3D-Autorennen gegen
+Computergegner – siehe [unten](#zweites-minigame-kurvenfieber).
+
 ## Spielen
 
 `index.html` im Browser öffnen (Doppelklick genügt).
@@ -139,4 +142,76 @@ Kein Level hier hat ein Zeitfenster unter 96 ms; das leichteste beginnt bei 154 
 | `node tools/solve.js` | beweist, dass jedes Level schaffbar ist, berechnet die Wertung und schreibt die Demos |
 | `node tools/smoke-test.js` | spielt das Spiel in einem unsichtbaren Chromium durch (braucht [Playwright](https://playwright.dev)) |
 | `node tools/build.js` | packt alles in eine einzige Datei `dist/wuerfelflug.html` zum Weitergeben |
+| `node tools/build.js rennen` | dasselbe für das Rennen: `dist/kurvenfieber.html` |
+| `node tools/race-test.js` | prüft die Rennstrecken und fährt Rennen nur mit Computerautos (ohne Browser, 1 Sekunde) |
+| `node tools/smoke-test-rennen.js` | spielt das Rennen in einem unsichtbaren Chromium durch |
 | `node tools/serve.js` | lokaler Webserver |
+
+---
+
+# Zweites Minigame: Kurvenfieber
+
+Ein 3D-Autorennen im Browser gegen fünf Computergegner. Drei Rundkurse, drei
+Schwierigkeitsstufen, 2, 3 oder 5 Runden. Du startest als Letzter.
+
+`rennen/index.html` öffnen (Doppelklick genügt) oder über den Knopf im Menü von Würfelflug.
+Mit Webserver: `node tools/serve.js`, dann <http://localhost:8080/rennen/>.
+
+| Eingabe | Wirkung |
+| --- | --- |
+| Pfeil hoch oder W | Gas |
+| Pfeil runter oder S | bremsen, im Stand rückwärts |
+| Pfeil links/rechts oder A/D | lenken |
+| Leertaste oder Shift | Turbo |
+| C | Kamera: hinter dem Auto oder auf der Motorhaube |
+| P/Esc, M, R | Pause, Ton, Neustart |
+| Gamepad | linker Stick lenkt, rechter Trigger Gas, linker Trigger Bremse, A Turbo |
+| Handy | Tasten am unteren Rand |
+
+## Was drin ist
+
+- **Drei Strecken:** *Sonnenküste* (1,3 km, weite Bögen auf einer Insel mit Palmen),
+  *Bergpass* (1,7 km, Haarnadeln und 40 m Höhenunterschied im Nadelwald) und
+  *Nachtstadt* (1,3 km, enge Ecken zwischen Hochhäusern, Laternen und Scheinwerfer).
+- **Computergegner** fahren die Ideallinie (außen anfahren, innen am Scheitel), bremsen
+  vor Kurven rechtzeitig, überholen auf der Seite mit mehr Platz und fahren dir nicht
+  ins Heck. Jeder hat ein etwas anderes Können und eine eigene Spur. Wer weit hinter dir
+  liegt, holt ein wenig auf.
+- **Fahrphysik:** Zu schnell in der Kurve, und das Auto rutscht nach außen und verliert
+  Tempo. Gras bremst, die Leitplanke noch mehr. Autos rempeln sich gegenseitig.
+- **Turbo:** mehr Schub und höheres Spitzentempo, füllt sich langsam von selbst wieder auf.
+- **Anzeige:** Platz, Runde, Zeit, Bestrunde, Abstände zu allen Fahrern, Minikarte,
+  Tacho, Turbo-Balken, Warnung bei falscher Richtung, Startampel.
+- **Ergebnis** mit Zeiten und Abständen aller Fahrer; Bestrunde und Siege je Strecke
+  merkt sich der Browser.
+- Motor, Reifenquietschen und Rempler entstehen live im Browser, ohne Sound-Dateien.
+
+## Aufbau
+
+| Datei | Aufgabe |
+| --- | --- |
+| `rennen/index.html`, `rennen/css/style.css` | Seite, Menü, Anzeige |
+| `rennen/js/tracks.js` | Strecken (Stützpunkte mit Höhe), Autos, Schwierigkeitsstufen |
+| `rennen/js/track.js` | glatte Kurve durch die Stützpunkte, Ideallinie, Kurventempo (läuft auch ohne Browser) |
+| `rennen/js/sim.js` | Fahrphysik, Computergegner, Zusammenstöße, Runden (läuft auch ohne Browser) |
+| `rennen/js/render3d.js` | 3D-Szene: Fahrbahn, Gelände, Landschaft, Autos, Kamera |
+| `rennen/js/audio.js` | Motor und Geräusche |
+| `rennen/js/game.js` | Ablauf, Eingabe, Anzeige, Menü |
+| `rennen/vendor/three.min.js` | [Three.js](https://threejs.org) r149 (MIT-Lizenz), liegt bei, damit das Spiel ohne Netz läuft |
+
+Jedes Auto wird entlang der Strecke beschrieben: Weg `s`, seitlicher Abstand `d` und
+Winkel zur Fahrtrichtung. Daraus folgen Rundenzählung, Platzierung, Leitplanke und
+Ideallinie ganz direkt. Die Physik rechnet in festen Schritten (120 pro Sekunde).
+
+## Eigene Strecke
+
+In `rennen/js/tracks.js` einen Eintrag mit Stützpunkten `[x, z, Höhe]` in Metern anlegen
+(geschlossener Rundkurs, Start am ersten Punkt). Für Stadtkurse baut `corners()` aus
+einem Vieleck abgerundete Ecken. Danach prüfen:
+
+```
+node tools/race-test.js
+```
+
+Der Test meldet zu enge Kurven, Streckenteile, die sich zu nahe kommen, und ob ein
+fehlerfreier Testfahrer und ein volles Feld auf jeder Schwierigkeit ins Ziel kommen.

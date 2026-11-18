@@ -1,16 +1,24 @@
 #!/usr/bin/env node
-/* Würfelflug – alles in EINE Datei packen (Stil und Skripte eingebettet).
+/* Würfelflug und Kurvenfieber – ein Spiel in EINE Datei packen (Stil und Skripte eingebettet).
 
    Aufruf:  node tools/build.js                    ->  dist/wuerfelflug.html
                                                        (eine Datei zum Weitergeben, läuft per Doppelklick)
-            node tools/build.js --fragment <Datei> ->  Seiteninhalt ohne <html>/<head>/<body>,
+            node tools/build.js rennen             ->  dist/kurvenfieber.html (das 3D-Rennen)
+            node tools/build.js [rennen] --fragment <Datei>
+                                                   ->  Seiteninhalt ohne <html>/<head>/<body>,
                                                        z. B. zum Veröffentlichen als Claude-Artefakt */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 
-const root = path.join(__dirname, '..');
+const GAMES = {
+  wuerfelflug: { dir: '', out: 'wuerfelflug.html' },
+  rennen: { dir: 'rennen', out: 'kurvenfieber.html' }
+};
+const gameName = process.argv.slice(2).find(a => GAMES[a]) || 'wuerfelflug';
+const game = GAMES[gameName];
+const root = path.join(__dirname, '..', game.dir);
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 function build(fragment) {
@@ -60,7 +68,7 @@ function main() {
   const args = process.argv.slice(2);
   const i = args.indexOf('--fragment');
   const fragment = i >= 0;
-  const out = fragment ? args[i + 1] : path.join(root, 'dist', 'wuerfelflug.html');
+  const out = fragment ? args[i + 1] : path.join(__dirname, '..', 'dist', game.out);
   if (!out) {
     console.error('Bitte eine Zieldatei angeben:  node tools/build.js --fragment <Datei>');
     process.exit(2);
